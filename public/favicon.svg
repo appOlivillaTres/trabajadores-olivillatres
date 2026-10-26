@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="logo-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" class="w-full h-full drop-shadow-md transition-transform duration-300 group-hover:scale-105">
+                    <!-- Central Blue Circle -->
+                    <circle cx="250" cy="250" r="92" fill="#4F4A8B"></circle>
+                    
+                    <!-- Inner Arc: Top-right to bottom-right -->
+                    <!-- Radius: 128, start angle: -85deg, end angle: 85deg -->
+                    <path d="M 261.16 122.49 A 128 128 0 0 1 261.16 377.51" fill="none" stroke="#B63B8B" stroke-width="17" stroke-linecap="round"></path>
+                    
+                    <!-- Middle Arc: Top-right around right/bottom to bottom-left -->
+                    <!-- Radius: 156, start angle: -87deg, end angle: 140deg -->
+                    <path d="M 258.17 94.21 A 156 156 0 1 1 130.48 350.27" fill="none" stroke="#B63B8B" stroke-width="17" stroke-linecap="round"></path>
+                    
+                    <!-- Outer Arc: Top-right around right/bottom/left to middle-left -->
+                    <!-- Radius: 184, start angle: -88deg, end angle: 175deg -->
+                    <path d="M 256.42 66.08 A 184 184 0 1 1 66.72 266.03" fill="none" stroke="#B63B8B" stroke-width="17" stroke-linecap="round"></path>
+                </svg>
