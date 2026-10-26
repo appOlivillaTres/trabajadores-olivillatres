@@ -108,6 +108,42 @@ export function AuthProvider({ children }) {
     return userProfile
   }, [])
 
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    if (!supabase || !session?.user?.email) {
+      throw new Error('No se ha podido identificar tu cuenta.')
+    }
+
+    if (!currentPassword || !newPassword) {
+      throw new Error('Completa todos los campos.')
+    }
+
+    if (newPassword.length < 8) {
+      throw new Error('La nueva contraseña debe tener al menos 8 caracteres.')
+    }
+
+    if (currentPassword === newPassword) {
+      throw new Error('La nueva contraseña debe ser diferente de la actual.')
+    }
+
+    // Comprobar la contraseña actual sin permitir cambiar otra cuenta.
+    const { data, error: loginError } = await supabase.auth.signInWithPassword({
+      email: session.user.email,
+      password: currentPassword,
+    })
+
+    if (loginError || data.user?.id !== session.user.id) {
+      throw new Error('La contraseña actual es incorrecta.')
+    }
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    })
+
+    if (updateError) {
+      throw new Error('No se ha podido actualizar la contraseña. Inténtalo de nuevo.')
+    }
+  }, [session])
+
   const signOut = useCallback(async () => {
     if (!supabase) return
     const { error } = await supabase.auth.signOut()
@@ -121,9 +157,10 @@ export function AuthProvider({ children }) {
     loading,
     profileError,
     signIn,
+    changePassword,
     signOut,
     refreshProfile: () => session?.user?.id ? loadProfile(session.user.id) : null,
-  }), [session, profile, loading, profileError, signIn, signOut, loadProfile])
+  }), [session, profile, loading, profileError, signIn, signOut, changePassword, loadProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
