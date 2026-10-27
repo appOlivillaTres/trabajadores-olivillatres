@@ -82,18 +82,25 @@ export async function getReportsWithDetails({
   const worksiteIds = [...new Set(rows.map((row) => row.worksite_id).filter(Boolean))]
   const profileIds = [...new Set(rows.map((row) => row.created_by).filter(Boolean))]
 
-  const participants = await fetchByIds(
-    'work_report_workers',
-    'id, report_id, worker_id, hours, created_at',
-    'report_id',
-    reportIds,
-  )
+  // Las obras no dependen de los participantes: pedirlas en paralelo evita
+  // una espera de red innecesaria cuando el historial contiene muchos partes.
+  const [participants, worksites] = await Promise.all([
+    fetchByIds(
+      'work_report_workers',
+      'id, report_id, worker_id, hours, created_at',
+      'report_id',
+      reportIds,
+    ),
+    fetchByIds('worksites', 'id, name, address, active', 'id', worksiteIds),
+  ])
   profileIds.push(...participants.map((participant) => participant.worker_id).filter(Boolean))
 
-  const [worksites, profiles] = await Promise.all([
-    fetchByIds('worksites', 'id, name, address, active', 'id', worksiteIds),
-    fetchByIds('profiles', 'id, username, display_name, role, active', 'id', [...new Set(profileIds)]),
-  ])
+  const profiles = await fetchByIds(
+    'profiles',
+    'id, username, display_name, role, active',
+    'id',
+    [...new Set(profileIds)],
+  )
 
   const worksitesById = new Map(worksites.map((row) => [row.id, row]))
   const profilesById = new Map(profiles.map((row) => [row.id, row]))
