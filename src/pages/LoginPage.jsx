@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { isSupabaseConfigured } from '../lib/supabase'
+import { canAccessSection } from '../lib/permissions'
 
 export default function LoginPage() {
   const { user, profile, loading, signIn } = useAuth()
@@ -13,7 +14,7 @@ export default function LoginPage() {
   const [submitting, setSubmitting] = useState(false)
 
   if (loading) return <div className="container py-5 text-center"><div className="spinner-border text-success" role="status"><span className="visually-hidden">Cargando...</span></div></div>
-  if (user && profile?.active) return <Navigate to={profile.role === 'admin' ? '/dashboard' : '/parte'} replace />
+  if (user && profile?.active) return <Navigate to={profile.role === 'worker' ? '/parte' : '/panel'} replace />
 
 
   async function handleSubmit(event) {
@@ -27,7 +28,7 @@ export default function LoginPage() {
 
       navigate(
         destination ||
-        (signedInProfile.role === 'admin' ? '/dashboard' : '/parte'),
+        (signedInProfile.role === 'worker' ? '/parte' : '/panel'),
         { replace: true }
       )
     } catch (signInError) {

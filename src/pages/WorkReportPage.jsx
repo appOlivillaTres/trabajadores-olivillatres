@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { canAccessSection, SECTION } from '../lib/permissions'
 import { useWorkReports } from '../features/reports/hooks/useWorkReports'
 import WorksiteSelector from '../features/reports/components/WorksiteSelector'
 import WorkerPicker from '../features/reports/components/WorkerPicker'
@@ -94,7 +95,7 @@ export default function WorkReportPage() {
   }, [profile?.id, profile?.role])
 
   useEffect(() => {
-    if (profile?.role === 'admin' && workers.length && !workers.some((worker) => worker.id === scheduleWorkerId)) {
+    if (canAccessSection(profile, SECTION.PARTS) && workers.length && !workers.some((worker) => worker.id === scheduleWorkerId)) {
       setScheduleWorkerId(workers[0].id)
     }
   }, [profile?.role, workers, scheduleWorkerId])
@@ -142,7 +143,7 @@ export default function WorkReportPage() {
     setOwnWorkerAbsent(false)
     setAbsenceCheckLoading(true)
     setAbsenceCheckError('')
-    const check = profile.role === 'admin'
+    const check = canAccessSection(profile, SECTION.PARTS)
       ? getAbsences({ from: workDate, to: workDate }).then((rows) => ({ rows, ownAbsent: false }))
       : hasCurrentWorkerAbsence(workDate).then((ownAbsent) => ({ rows: [], ownAbsent }))
     check
@@ -193,7 +194,7 @@ export default function WorkReportPage() {
   // El horario está asociado al trabajador y al día seleccionado, no a cada obra.
   // Al volver a elegir una fecha, recupera lo guardado para evitar sobrescribirlo por accidente.
   useEffect(() => {
-    const targetWorkerId = profile?.role === 'worker' ? profile.id : (profile?.role === 'admin' ? scheduleWorkerId : '')
+    const targetWorkerId = profile?.role === 'worker' ? profile.id : (canAccessSection(profile, SECTION.PARTS) ? scheduleWorkerId : '')
     if (!targetWorkerId || !workDate) return undefined
 
     let cancelled = false
@@ -329,11 +330,11 @@ export default function WorkReportPage() {
       return `No se puede registrar el parte porque hay trabajadores ausentes en esta fecha: ${absentNames.join(', ')}.`
     }
     if (hasExistingOwnDay) return 'Ya tienes un parte registrado en esta fecha. Entra en «Mis partes» y solicita una modificación.'
-    if (profile?.role === 'admin' && duplicateParticipants.length > 0) {
+    if (canAccessSection(profile, SECTION.PARTS) && duplicateParticipants.length > 0) {
       return `Ya hay registros para ${duplicateParticipants.join(', ')} en esta fecha. Usa Revisiones para editar un parte existente.`
     }
-    if (profile?.role === 'admin' && !scheduleWorkerId) return 'Selecciona el trabajador al que corresponde el horario.'
-    if (profile?.role === 'worker' || profile?.role === 'admin') {
+    if (canAccessSection(profile, SECTION.PARTS) && !scheduleWorkerId) return 'Selecciona el trabajador al que corresponde el horario.'
+    if (profile?.role === 'worker' || canAccessSection(profile, SECTION.PARTS)) {
       if (scheduleLoadError) return 'No se pudo cargar el horario guardado. Recarga el horario antes de guardar para evitar perder datos.'
       const scheduleError = validateSchedule()
       if (scheduleError) return scheduleError
@@ -402,7 +403,7 @@ export default function WorkReportPage() {
           participants: block.participants,
         })),
       })
-      if (profile?.role === 'admin' && scheduleDirty) {
+      if (canAccessSection(profile, SECTION.PARTS) && scheduleDirty) {
         await saveWorkdayScheduleForWorker(scheduleWorkerId, workDate, schedule)
       }
       const savedBlockCount = blocks.length
@@ -488,7 +489,7 @@ export default function WorkReportPage() {
             </section>
           ) : (
             <>
-              {profile?.role === 'admin' && duplicateParticipants.length > 0 && (
+              {canAccessSection(profile, SECTION.PARTS) && duplicateParticipants.length > 0 && (
                 <div className="alert alert-warning" role="alert">
                   <h2 className="h6 fw-bold">Hay trabajadores con partes ya registrados en esta fecha</h2>
                   <p className="mb-2">No se puede crear un segundo parte para: {duplicateParticipants.join(', ')}.</p>
@@ -496,7 +497,7 @@ export default function WorkReportPage() {
                 </div>
               )}
               <fieldset className="border-0 p-0 m-0" disabled={dateCheckLoading || Boolean(dateCheckError) || absenceCheckLoading || Boolean(absenceCheckError) || (profile?.role === 'worker' && ownWorkerAbsent)}>
-          {(profile?.role === 'worker' || profile?.role === 'admin') && (
+          {(profile?.role === 'worker' || canAccessSection(profile, SECTION.PARTS)) && (
             <section className="card border-0 shadow-sm mb-4" aria-labelledby="schedule-heading">
               <div className="card-body p-3 p-md-4">
                 <div className="mb-3">
@@ -505,7 +506,7 @@ export default function WorkReportPage() {
                   <div className="alert alert-info py-2 mb-3" role="note">
                     <span className="fw-semibold">Importante:</span> Registra la entrada y la salida de la jornada completa. Este horario incluye el tiempo de almuerzo estipulado.
                   </div>
-                  {profile?.role === 'admin' && (
+                  {canAccessSection(profile, SECTION.PARTS) && (
                     <div className="mb-3">
                       <label htmlFor="schedule-worker" className="form-label">Trabajador al que corresponde este horario *</label>
                       <select id="schedule-worker" className="form-select" value={scheduleWorkerId} onChange={(event) => { setScheduleWorkerId(event.target.value); setScheduleDirty(false); setFormError(''); setSuccessMessage('') }} disabled={saving || workers.length === 0} required>
@@ -648,7 +649,7 @@ export default function WorkReportPage() {
 
           <div className="d-flex flex-column flex-sm-row justify-content-end gap-2">
             <button type="button" className="btn btn-outline-secondary" onClick={resetForm} disabled={saving}>Limpiar formulario</button>
-            <button type="submit" className="btn btn-success btn-lg" disabled={saving || dateCheckLoading || Boolean(dateCheckError) || absenceCheckLoading || Boolean(absenceCheckError) || (profile?.role === 'worker' && ownWorkerAbsent) || hasExistingOwnDay || (profile?.role === 'admin' && duplicateParticipants.length > 0) || worksites.length === 0 || workers.length === 0 || (profile?.role === 'admin' && !scheduleWorkerId) || ((profile?.role === 'worker' || profile?.role === 'admin') && (scheduleLoading || Boolean(scheduleLoadError)))}>
+            <button type="submit" className="btn btn-success btn-lg" disabled={saving || dateCheckLoading || Boolean(dateCheckError) || absenceCheckLoading || Boolean(absenceCheckError) || (profile?.role === 'worker' && ownWorkerAbsent) || hasExistingOwnDay || (canAccessSection(profile, SECTION.PARTS) && duplicateParticipants.length > 0) || worksites.length === 0 || workers.length === 0 || (canAccessSection(profile, SECTION.PARTS) && !scheduleWorkerId) || ((profile?.role === 'worker' || canAccessSection(profile, SECTION.PARTS)) && (scheduleLoading || Boolean(scheduleLoadError)))}>
               {saving ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true" />Guardando parte...</> : `Guardar parte diario (${blocks.length} ${blocks.length === 1 ? 'obra' : 'obras'})`}
             </button>
           </div>

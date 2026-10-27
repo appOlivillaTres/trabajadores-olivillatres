@@ -33,3 +33,4 @@ dist/
 !.env.template
 .DS_Store
 *.log
+/supabase/

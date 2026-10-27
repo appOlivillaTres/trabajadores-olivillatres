@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
 
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, display_name, role, active')
+      .select('id, username, display_name, role, active')
       .eq('id', userId)
       .maybeSingle()
 
@@ -28,9 +28,21 @@ export function AuthProvider({ children }) {
       return null
     }
 
+    let permissions = []
+    if (data?.active && data.role !== 'admin_general') {
+      const { data: permissionRows, error: permissionError } = await supabase
+        .from('user_section_permissions').select('section').eq('user_id', userId)
+      if (permissionError) {
+        setProfileError('No se han podido cargar tus permisos. Comprueba que la migración de permisos se haya ejecutado en Supabase.')
+        setProfile(null)
+        return null
+      }
+      permissions = (permissionRows || []).map((row) => row.section)
+    }
+    const completeProfile = { ...data, permissions }
     setProfileError('')
-    setProfile(data)
-    return data
+    setProfile(completeProfile)
+    return completeProfile
   }, [])
 
   useEffect(() => {
@@ -89,7 +101,7 @@ export function AuthProvider({ children }) {
 
     const { data: userProfile, error: profileLookupError } = await supabase
       .from('profiles')
-      .select('role, active')
+      .select('id, username, role, active')
       .eq('id', data.user.id)
       .maybeSingle()
 
@@ -105,7 +117,17 @@ export function AuthProvider({ children }) {
       )
     }
 
-    return userProfile
+    let permissions = []
+    if (userProfile.role !== 'admin_general') {
+      const { data: rows, error: permissionError } = await supabase
+        .from('user_section_permissions').select('section').eq('user_id', data.user.id)
+      if (permissionError) {
+        await supabase.auth.signOut()
+        throw new Error('No se han podido cargar tus permisos. Comprueba la migración de Supabase.')
+      }
+      permissions = (rows || []).map((row) => row.section)
+    }
+    return { ...userProfile, permissions }
   }, [])
 
   const changePassword = useCallback(async (currentPassword, newPassword) => {

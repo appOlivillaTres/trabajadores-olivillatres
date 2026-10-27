@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import { useWorksites } from '../features/worksites/hooks/useWorksites'
+import { canAccessSection, SECTION } from '../lib/permissions'
 
 export default function WorksitesPage() {
   const { profile } = useAuth()
@@ -14,7 +15,7 @@ export default function WorksitesPage() {
   const completedWorksites = useMemo(() => worksites.filter((worksite) => !worksite.active), [worksites])
   const visibleWorksites = activeTab === 'active' ? activeWorksites : completedWorksites
 
-  if (profile?.role !== 'admin') {
+  if (!canAccessSection(profile, SECTION.PARTS)) {
     return <div className="alert alert-danger" role="alert">No tienes permisos para gestionar las obras.</div>
   }
 

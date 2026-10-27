@@ -48,6 +48,10 @@ async function getFunctionError(error) {
 
 export async function setWorkerActive(workerId, active) {
   requireSupabase()
-  const { error } = await supabase.from('profiles').update({ active }).eq('id', workerId).eq('role', 'worker')
-  if (error) throw error
+  const { data, error } = await supabase.functions.invoke('admin-manage-worker', {
+    body: { action: 'set-active', workerId, active },
+  })
+  if (error) throw new Error(await getFunctionError(error))
+  if (data?.error) throw new Error(data.error)
+  return data
 }
