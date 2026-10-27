@@ -24,11 +24,8 @@ export default function LoginPage() {
 
     try {
       const signedInProfile = await signIn(username.trim(), password)
-      const destination = location.state?.from?.pathname
-
       navigate(
-        destination ||
-        (signedInProfile.role === 'worker' ? '/parte' : '/panel'),
+        signedInProfile.role === 'worker' ? '/parte' : '/panel',
         { replace: true }
       )
     } catch (signInError) {
