@@ -26,6 +26,7 @@ export default function AppLayout() {
   const canParts = canAccessSection(profile, SECTION.PARTS)
   const canWorkers = canAccessSection(profile, SECTION.WORKERS)
   const canVehicles = canAccessSection(profile, SECTION.VEHICLES)
+  const canEpisRopa = canAccessSection(profile, SECTION.EPIS_ROPA)
   const canPermissions = canManagePermissions(profile)
 
   const linkClass = ({ isActive }) =>
@@ -264,6 +265,16 @@ export default function AppLayout() {
                         >
                           Fichas de trabajadores
                         </NavLink>
+                      </div>
+                    </div>
+                  )}
+
+                  {canEpisRopa && (
+                    <div className="nav-item dropdown" onMouseEnter={() => setOpenMenu('episRopa')} onMouseLeave={closeMenu}>
+                      <button type="button" className={menuButtonClass(openMenu === 'episRopa')} aria-expanded={openMenu === 'episRopa'} onClick={() => toggleMenu('episRopa')}>EPIS y ROPA</button>
+                      <div className={`dropdown-menu ${openMenu === 'episRopa' ? 'show' : ''}`}>
+                        <NavLink className={menuItemClass} to="/epis" onClick={closeMenu}>EPIS / Entregas</NavLink>
+                        <NavLink className={menuItemClass} to="/ropa" onClick={closeMenu}>ROPA / Stock</NavLink>
                       </div>
                     </div>
                   )}

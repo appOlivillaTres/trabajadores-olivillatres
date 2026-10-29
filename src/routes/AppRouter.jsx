@@ -14,6 +14,8 @@ import WorkerRecordsPage from '../pages/WorkerRecordsPage'
 import ReviewsPage from '../pages/ReviewsPage'
 import AbsencesPage from '../pages/AbsencesPage'
 import ReportsExportPage from '../pages/ReportsExportPage'
+import EpisPage from '../pages/EpisPage'
+import ClothingStockPage from '../pages/ClothingStockPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
 import NotFoundPage from '../pages/NotFoundPage'
 import { SECTION } from '../lib/permissions'
@@ -22,6 +24,7 @@ export default function AppRouter() {
  <Route element={<ProtectedRoute requiredSection={SECTION.PARTS}/> }><Route path="usuarios" element={<EmployeesPage/>}/><Route path="partes-panel" element={<DashboardPage/>}/><Route path="obras" element={<WorksitesPage/>}/><Route path="revisiones" element={<ReviewsPage/>}/><Route path="ausencias" element={<AbsencesPage/>}/><Route path="exportar" element={<ReportsExportPage/>}/></Route>
  <Route element={<ProtectedRoute requiredSection={SECTION.WORKERS}/> }><Route path="trabajadores" element={<WorkerRecordsPage/>}/></Route>
  <Route element={<ProtectedRoute requiredSection={SECTION.VEHICLES}/> }><Route path="vehiculos" element={<VehiclesPage/>}/></Route>
+ <Route element={<ProtectedRoute requiredSection={SECTION.EPIS_ROPA}/> }><Route path="epis" element={<EpisPage/>}/><Route path="ropa" element={<ClothingStockPage/>}/></Route>
  <Route element={<ProtectedRoute requirePermissionManagement/>}><Route path="usuarios-permisos" element={<UserPermissionsPage/>}/></Route>
  </Route></Route><Route path="*" element={<NotFoundPage/>}/></Routes>
 }
