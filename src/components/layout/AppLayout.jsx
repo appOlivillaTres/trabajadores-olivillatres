@@ -271,10 +271,10 @@ export default function AppLayout() {
 
                   {canEpisRopa && (
                     <div className="nav-item dropdown" onMouseEnter={() => setOpenMenu('episRopa')} onMouseLeave={closeMenu}>
-                      <button type="button" className={menuButtonClass(openMenu === 'episRopa')} aria-expanded={openMenu === 'episRopa'} onClick={() => toggleMenu('episRopa')}>EPIS y ROPA</button>
+                      <button type="button" className={menuButtonClass(openMenu === 'episRopa')} aria-expanded={openMenu === 'episRopa'} onClick={() => toggleMenu('episRopa')}>EPIs y Ropa</button>
                       <div className={`dropdown-menu ${openMenu === 'episRopa' ? 'show' : ''}`}>
-                        <NavLink className={menuItemClass} to="/epis" onClick={closeMenu}>EPIS / Entregas</NavLink>
-                        <NavLink className={menuItemClass} to="/ropa" onClick={closeMenu}>ROPA / Stock</NavLink>
+                        <NavLink className={menuItemClass} to="/epis" onClick={closeMenu}>EPIs / Entregas</NavLink>
+                        <NavLink className={menuItemClass} to="/ropa" onClick={closeMenu}>Ropa / Stock</NavLink>
                       </div>
                     </div>
                   )}
