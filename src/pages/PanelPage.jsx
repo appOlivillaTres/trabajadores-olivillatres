@@ -5,8 +5,8 @@ const cards = [
  { section: SECTION.PARTS, title: 'Partes de trabajadores', description: 'Partes, obras, revisiones, ausencias y exportaciones.', to: '/partes-panel' },
  { section: SECTION.WORKERS, title: 'Trabajadores', description: 'Consultar y gestionar la información de trabajadores.', to: '/trabajadores' },
  { section: SECTION.VEHICLES, title: 'Vehículos', description: 'Acceso al módulo de vehículos.', to: '/vehiculos' },
- { section: SECTION.EPIS_ROPA, title: 'EPIS', description: 'Registrar entregas y generar justificantes de recepción.', to: '/epis' },
- { section: SECTION.EPIS_ROPA, title: 'ROPA', description: 'Control de artículos, tallas, entradas y movimientos de stock.', to: '/ropa' },
+ { section: SECTION.EPIS_ROPA, title: 'EPIs', description: 'Registrar entregas y generar justificantes de recepción.', to: '/epis' },
+ { section: SECTION.EPIS_ROPA, title: 'Ropa', description: 'Control de artículos, tallas, entradas y movimientos de stock.', to: '/ropa' },
 ]
 export default function PanelPage() {
  const { profile } = useAuth()
