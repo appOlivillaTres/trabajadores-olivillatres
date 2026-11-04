@@ -55,3 +55,24 @@ export async function setWorkerActive(workerId, active) {
   if (data?.error) throw new Error(data.error)
   return data
 }
+
+
+export async function updateWorkerDetails({ workerId, username, displayName }) {
+  requireSupabase()
+  const { data, error } = await supabase.functions.invoke('admin-manage-worker', {
+    body: { action: 'update-details', workerId, username, displayName },
+  })
+  if (error) throw new Error(await getFunctionError(error))
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
+export async function deleteWorkerAccount(workerId) {
+  requireSupabase()
+  const { data, error } = await supabase.functions.invoke('admin-manage-worker', {
+    body: { action: 'delete', workerId },
+  })
+  if (error) throw new Error(await getFunctionError(error))
+  if (data?.error) throw new Error(data.error)
+  return data
+}
