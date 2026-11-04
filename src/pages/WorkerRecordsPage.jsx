@@ -7,6 +7,8 @@ const EMPTY = {
   hire_date: new Date().toISOString().slice(0, 10), termination_date: '',
 }
 const BUCKET = 'worker-documents'
+const PAGE_SIZE = 9
+const normalizeSearch = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim()
 const DOCUMENTS = [
   { key: 'dni_pdf_path', label: 'DNI / NIE (PDF con ambas caras)' },
   { key: 'social_security_pdf_path', label: 'Tarjeta de la Seguridad Social (PDF con ambas caras)' },
@@ -46,6 +48,7 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [archive, setArchive] = useState(false)
+  const [page, setPage] = useState(1)
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState(EMPTY)
   const [files, setFiles] = useState({})
@@ -61,10 +64,14 @@ export default function EmployeesPage() {
   useEffect(() => { load() }, [load])
 
   const filtered = useMemo(() => records.filter((record) => {
-    const term = search.trim().toLocaleLowerCase('es')
-    const text = `${record.first_name} ${record.last_name} ${record.dni}`.toLocaleLowerCase('es')
+    const term = normalizeSearch(search)
+    const text = normalizeSearch(`${record.first_name} ${record.last_name} ${record.dni}`)
     return Boolean(record.termination_date) === archive && (!term || text.includes(term))
   }), [records, search, archive])
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const pageRecords = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  useEffect(() => { setPage(1) }, [search, archive])
+  useEffect(() => { if (page > totalPages) setPage(totalPages) }, [page, totalPages])
 
   function startNew() {
     setEditing('new'); setForm(EMPTY); setFiles({}); setNotice(null)
@@ -83,14 +90,14 @@ export default function EmployeesPage() {
     event.preventDefault(); setNotice(null); setSaving(true)
     let createdId = editing !== 'new' ? editing : null
     try {
-      if (!String(form.first_name ?? '').trim() || !String(form.last_name ?? '').trim() || !String(form.dni ?? '').trim()) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
+      if (!form.first_name.trim() || !form.last_name.trim() || !form.dni.trim()) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
       const { data: authData, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
       const payload = {
-        first_name: String(form.first_name ?? '').trim(), last_name: String(form.last_name ?? '').trim(), dni: String(form.dni ?? '').trim().toUpperCase(),
-        social_security_number: String(form.social_security_number ?? '').trim() || null, phone: String(form.phone ?? '').trim() || null,
-        address: String(form.address ?? '').trim() || null, population: String(form.population ?? '').trim() || null, province: String(form.province ?? '').trim() || null,
-        observations: String(form.observations ?? '').trim() || null, has_driving_license: Boolean(form.has_driving_license),
+        first_name: form.first_name.trim(), last_name: form.last_name.trim(), dni: form.dni.trim().toUpperCase(),
+        social_security_number: form.social_security_number.trim() || null, phone: form.phone.trim() || null,
+        address: form.address.trim() || null, population: form.population.trim() || null, province: form.province.trim() || null,
+        observations: form.observations.trim() || null, has_driving_license: Boolean(form.has_driving_license),
         hire_date: form.hire_date || null, termination_date: form.termination_date || null,
         updated_by: authData.user?.id || null,
       }
@@ -184,8 +191,8 @@ export default function EmployeesPage() {
 
     {!editing && <div className="card border-0 shadow-sm"><div className="card-body p-3 p-md-4">
       <div className="d-flex flex-column flex-md-row gap-2 mb-3"><div className="btn-group" role="group" aria-label="Estado de fichas"><button className={`btn ${!archive ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setArchive(false)}>Fichas activas</button><button className={`btn ${archive ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setArchive(true)}>Bajas / archivo</button></div><input className="form-control" placeholder="Buscar por nombre, apellidos o DNI…" aria-label="Buscar ficha" value={search} onChange={(event) => setSearch(event.target.value)}/></div>
-      {loading ? <p className="text-secondary">Cargando fichas…</p> : filtered.length === 0 ? <div className="text-center text-secondary py-4">No hay fichas que coincidan con la búsqueda.</div> : <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Trabajador</th><th>DNI / NIE</th><th>Teléfono</th><th>Estado</th><th className="text-end">Acciones</th></tr></thead><tbody>{filtered.map((record) => <tr key={record.id}><td className="fw-semibold">{record.last_name}, {record.first_name}</td><td>{record.dni}</td><td>{record.phone || '—'}</td><td><span className={`badge ${record.termination_date ? 'text-bg-secondary' : 'text-bg-success'}`}>{record.termination_date ? `Baja: ${record.termination_date}` : 'Activa'}</span></td><td><div className="d-flex flex-wrap justify-content-end gap-2"><button className="btn btn-sm btn-outline-primary" onClick={() => startEdit(record)}>Ver / editar</button><button className={`btn btn-sm ${record.termination_date ? 'btn-outline-success' : 'btn-outline-danger'}`} onClick={() => toggleArchive(record)}>{record.termination_date ? 'Reactivar' : 'Dar de baja'}</button></div></td></tr>)}</tbody></table></div>}
-      <div className="small text-secondary">{filtered.length} fichas en este apartado.</div>
+      {loading ? <p className="text-secondary">Cargando fichas…</p> : filtered.length === 0 ? <div className="text-center text-secondary py-4">No hay fichas que coincidan con la búsqueda.</div> : <div className="w-100"><table className="table table-sm align-middle w-100 mb-0" style={{ tableLayout: 'fixed' }}><colgroup><col style={{ width: '30%' }}/><col style={{ width: '16%' }}/><col style={{ width: '15%' }}/><col style={{ width: '16%' }}/><col style={{ width: '23%' }}/></colgroup><thead><tr><th>Trabajador</th><th>DNI / NIE</th><th>Teléfono</th><th>Estado</th><th className="text-end">Acciones</th></tr></thead><tbody>{pageRecords.map((record) => <tr key={record.id}><td className="fw-semibold text-break">{record.last_name}, {record.first_name}</td><td className="text-break">{record.dni}</td><td className="text-break">{record.phone || '—'}</td><td><span className={`badge ${record.termination_date ? 'text-bg-secondary' : 'text-bg-success'}`}>{record.termination_date ? `Baja: ${record.termination_date}` : 'Activa'}</span></td><td><div className="d-flex flex-wrap justify-content-end gap-2"><button className="btn btn-sm btn-outline-primary" onClick={() => startEdit(record)}>Ver / editar</button><button className={`btn btn-sm ${record.termination_date ? 'btn-outline-success' : 'btn-outline-danger'}`} onClick={() => toggleArchive(record)}>{record.termination_date ? 'Reactivar' : 'Dar de baja'}</button></div></td></tr>)}</tbody></table></div>}
+      <div className="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3"><div className="small text-secondary">{filtered.length} fichas en este apartado · Página {page} de {totalPages}.</div>{totalPages > 1 && <nav aria-label="Paginación de fichas"><ul className="pagination pagination-sm mb-0"><li className={`page-item ${page === 1 ? 'disabled' : ''}`}><button className="page-link" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>Anterior</button></li><li className={`page-item ${page === totalPages ? 'disabled' : ''}`}><button className="page-link" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>Siguiente</button></li></ul></nav>}</div>
     </div></div>}
   </>
 }
