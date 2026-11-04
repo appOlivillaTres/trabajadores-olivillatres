@@ -83,14 +83,14 @@ export default function EmployeesPage() {
     event.preventDefault(); setNotice(null); setSaving(true)
     let createdId = editing !== 'new' ? editing : null
     try {
-      if (!form.first_name.trim() || !form.last_name.trim() || !form.dni.trim()) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
+      if (!String(form.first_name ?? '').trim() || !String(form.last_name ?? '').trim() || !String(form.dni ?? '').trim()) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
       const { data: authData, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
       const payload = {
-        first_name: form.first_name.trim(), last_name: form.last_name.trim(), dni: form.dni.trim().toUpperCase(),
-        social_security_number: form.social_security_number.trim() || null, phone: form.phone.trim() || null,
-        address: form.address.trim() || null, population: form.population.trim() || null, province: form.province.trim() || null,
-        observations: form.observations.trim() || null, has_driving_license: Boolean(form.has_driving_license),
+        first_name: String(form.first_name ?? '').trim(), last_name: String(form.last_name ?? '').trim(), dni: String(form.dni ?? '').trim().toUpperCase(),
+        social_security_number: String(form.social_security_number ?? '').trim() || null, phone: String(form.phone ?? '').trim() || null,
+        address: String(form.address ?? '').trim() || null, population: String(form.population ?? '').trim() || null, province: String(form.province ?? '').trim() || null,
+        observations: String(form.observations ?? '').trim() || null, has_driving_license: Boolean(form.has_driving_license),
         hire_date: form.hire_date || null, termination_date: form.termination_date || null,
         updated_by: authData.user?.id || null,
       }
