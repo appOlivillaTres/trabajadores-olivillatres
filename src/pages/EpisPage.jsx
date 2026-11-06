@@ -60,6 +60,8 @@ export default function EpisPage() {
   const [workers, setWorkers] = useState([])
   const [clothing, setClothing] = useState([])
   const [deliveries, setDeliveries] = useState([])
+  const [recentWorkerDeliveries, setRecentWorkerDeliveries] = useState([])
+  const [recentDeliveriesLoading, setRecentDeliveriesLoading] = useState(false)
   const [workerId, setWorkerId] = useState('')
   const [selectedPpe, setSelectedPpe] = useState([])
   const [customPpe, setCustomPpe] = useState('')
@@ -86,12 +88,72 @@ export default function EpisPage() {
   useEffect(() => { load() }, [load])
 
   const selectedWorker = workers.find(worker => worker.id === workerId)
-  const historyWorkers = useMemo(() => { const q = historyWorkerQuery.trim().toLocaleLowerCase('es'); return workers.filter(worker => !q || `${worker.first_name} ${worker.last_name} ${worker.dni}`.toLocaleLowerCase('es').includes(q)) }, [workers, historyWorkerQuery])
-  const filteredDeliveries = useMemo(() => { const q = historyWorkerQuery.trim().toLocaleLowerCase('es'); return deliveries.filter(delivery => !q || `${delivery.worker_name} ${delivery.worker_dni}`.toLocaleLowerCase('es').includes(q)) }, [deliveries, historyWorkerQuery])
+
+  // Consulta el historial completo de los últimos seis meses del trabajador seleccionado.
+  useEffect(() => {
+    let cancelled = false
+    if (!workerId) {
+      setRecentWorkerDeliveries([])
+      setRecentDeliveriesLoading(false)
+      return () => { cancelled = true }
+    }
+
+    const cutoff = new Date()
+    cutoff.setMonth(cutoff.getMonth() - 6)
+    const cutoffDate = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`
+
+    async function loadRecentDeliveries() {
+      setRecentDeliveriesLoading(true)
+      setRecentWorkerDeliveries([])
+      const { data, error } = await supabase
+        .from('epis_deliveries')
+        .select('id,delivery_date,epis_delivery_lines(item_name,line_type,size,quantity)')
+        .eq('worker_record_id', workerId)
+        .gte('delivery_date', cutoffDate)
+        .order('delivery_date', { ascending: false })
+
+      if (!cancelled) {
+        if (error) {
+          console.error('No se pudo consultar el historial reciente de EPIs:', error)
+          setRecentWorkerDeliveries([])
+        } else {
+          setRecentWorkerDeliveries(data || [])
+        }
+        setRecentDeliveriesLoading(false)
+      }
+    }
+
+    loadRecentDeliveries()
+    return () => { cancelled = true }
+  }, [workerId])
+
   const lines = useMemo(() => [
     ...selectedPpe.map(name => ({ line_key: `epi:${name}`, line_type: 'epi', item_name: name, size: null, quantity: 1, is_initial: initialMode && initialLines.includes(`epi:${name}`) })),
     ...clothingLines.filter(line => line.item_id && Number(line.quantity) > 0).map(line => ({ line_key: `ropa:${line.key}`, line_type: 'ropa', item_id: line.item_id, item_name: clothing.find(item => item.id === line.item_id)?.name || '', size: line.size, quantity: Number(line.quantity), is_initial: initialMode && initialLines.includes(`ropa:${line.key}`) })),
   ], [selectedPpe, clothingLines, clothing, initialMode, initialLines])
+
+  const recentSelectedItems = useMemo(() => {
+    if (!lines.length || !recentWorkerDeliveries.length) return []
+    const selectedNames = new Set(lines.map(line => line.item_name.trim().toLocaleLowerCase('es')))
+    const matches = []
+    for (const delivery of recentWorkerDeliveries) {
+      for (const item of delivery.epis_delivery_lines || []) {
+        if (selectedNames.has(String(item.item_name || '').trim().toLocaleLowerCase('es'))) {
+          matches.push({
+            name: item.item_name,
+            size: item.size,
+            quantity: item.quantity,
+            date: delivery.delivery_date,
+          })
+        }
+      }
+    }
+    return matches
+  }, [lines, recentWorkerDeliveries])
+
+  const historyWorkers = useMemo(() => { const q = historyWorkerQuery.trim().toLocaleLowerCase('es'); return workers.filter(worker => !q || `${worker.first_name} ${worker.last_name} ${worker.dni}`.toLocaleLowerCase('es').includes(q)) }, [workers, historyWorkerQuery])
+  const filteredDeliveries = useMemo(() => { const q = historyWorkerQuery.trim().toLocaleLowerCase('es'); return deliveries.filter(delivery => !q || `${delivery.worker_name} ${delivery.worker_dni}`.toLocaleLowerCase('es').includes(q)) }, [deliveries, historyWorkerQuery])
+
 
   function addClothingLine() { setClothingLines(current => [...current, { key: crypto.randomUUID(), item_id: clothing[0]?.id || '', size: 'M', quantity: '1' }]) }
   function changeClothing(key, patch) { setClothingLines(current => current.map(line => line.key === key ? { ...line, ...patch } : line)) }
@@ -141,6 +203,7 @@ export default function EpisPage() {
       <div className="col-12 col-lg-6"><WorkerSelector workers={workers} value={workerId} onChange={setWorkerId} disabled={loading || saving} /></div>
       <div className="col-6 col-lg-3"><label className="form-label" htmlFor="delivery-date">Fecha de entrega</label><input id="delivery-date" className="form-control" type="date" value={date} onChange={event => setDate(event.target.value)} required /></div>
       <div className="col-6 col-lg-3"><label className="form-label" htmlFor="delivery-reason">Tipo predeterminado</label><input id="delivery-reason" className="form-control" value="Reposición" readOnly /><div className="form-text">Puedes marcar artículos como entrega inicial abajo.</div></div>
+      {workerId && (recentDeliveriesLoading || recentSelectedItems.length > 0) && <div className="col-12">{recentDeliveriesLoading ? <div className="small text-secondary" role="status">Comprobando entregas de los últimos 6 meses…</div> : <div className="alert alert-warning mb-0" role="status"><div className="fw-semibold mb-2">Este trabajador ha recibido los siguientes artículos en los últimos 6 meses:</div><ul className="mb-2 ps-3">{recentSelectedItems.map((item, index) => <li key={`${item.date}-${item.name}-${item.size || ''}-${index}`}><strong>{item.name}</strong>{item.size ? ` · Talla ${item.size}` : ''}{Number(item.quantity) > 1 ? ` · Cantidad: ${item.quantity}` : ''} — {new Date(`${item.date}T00:00:00`).toLocaleDateString('es-ES')}</li>)}</ul><div className="small">Este aviso es únicamente informativo. Puedes continuar con la entrega.</div></div>}</div>}
       <div className="col-12"><h3 className="h6">Equipos de protección individual</h3><div className="row g-2">{PPE.map(name => <div className="col-12 col-md-6 col-xl-4" key={name}><label className="form-check"><input className="form-check-input" type="checkbox" checked={selectedPpe.includes(name)} onChange={event => setSelectedPpe(current => event.target.checked ? [...current, name] : current.filter(item => item !== name))} /><span className="form-check-label">{name}</span></label></div>)}</div>
         {selectedPpe.some(name => !PPE.includes(name)) && <div className="mt-3"><div className="small fw-semibold mb-2">Otros EPIs añadidos</div><div className="d-flex flex-wrap gap-2">{selectedPpe.filter(name => !PPE.includes(name)).map(name => <span key={name} className="badge text-bg-light border d-inline-flex align-items-center gap-2 py-2 px-3">{name}<button type="button" className="btn-close" style={{ fontSize: '.65rem' }} aria-label={`Quitar ${name}`} onClick={() => setSelectedPpe(current => current.filter(item => item !== name))} /></span>)}</div></div>}
         <div className="row g-2 mt-2"><div className="col-12 col-md-8"><label className="form-label" htmlFor="custom-ppe">Añadir otro EPI</label><input id="custom-ppe" className="form-control" maxLength={150} value={customPpe} onChange={event => setCustomPpe(event.target.value)} placeholder="Escribe el nombre del equipo" /></div><div className="col-12 col-md-4 d-flex align-items-end"><button type="button" className="btn btn-outline-secondary" onClick={addCustomPpe} disabled={!customPpe.trim()}>Añadir EPI</button></div></div>
