@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { isSupabaseConfigured, supabase } from '../../lib/supabase'
 import { usernameToAuthEmail } from './usernameAuth'
 
@@ -9,13 +9,23 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState('')
+  // Evita volver a consultar el perfil cuando Supabase restaura/revalida
+  // la misma sesión al recuperar el foco de la pestaña.
+  const loadedProfileUserIdRef = useRef(null)
+  const sessionRef = useRef(null)
+  const profileRequestRef = useRef(null)
 
-  const loadProfile = useCallback(async (userId) => {
+  const loadProfile = useCallback(async (userId, { force = false } = {}) => {
     if (!supabase || !userId) {
+      loadedProfileUserIdRef.current = null
       setProfile(null)
       return null
     }
 
+    if (!force && loadedProfileUserIdRef.current === userId) return profileRequestRef.current?.userId === userId ? profileRequestRef.current.promise : null
+    if (!force && profileRequestRef.current?.userId === userId) return profileRequestRef.current.promise
+
+    const request = (async () => {
     const { data, error } = await supabase
       .from('profiles')
       .select('id, username, display_name, role, active')
@@ -24,6 +34,7 @@ export function AuthProvider({ children }) {
 
     if (error) {
       setProfileError('No se ha podido cargar tu perfil. Comprueba la configuración de Supabase.')
+      loadedProfileUserIdRef.current = null
       setProfile(null)
       return null
     }
@@ -34,6 +45,7 @@ export function AuthProvider({ children }) {
         .from('user_section_permissions').select('section').eq('user_id', userId)
       if (permissionError) {
         setProfileError('No se han podido cargar tus permisos. Comprueba que la migración de permisos se haya ejecutado en Supabase.')
+        loadedProfileUserIdRef.current = null
         setProfile(null)
         return null
       }
@@ -41,8 +53,16 @@ export function AuthProvider({ children }) {
     }
     const completeProfile = { ...data, permissions }
     setProfileError('')
+    loadedProfileUserIdRef.current = userId
     setProfile(completeProfile)
     return completeProfile
+    })()
+    profileRequestRef.current = { userId, promise: request }
+    try {
+      return await request
+    } finally {
+      if (profileRequestRef.current?.promise === request) profileRequestRef.current = null
+    }
   }, [])
 
   useEffect(() => {
@@ -53,29 +73,53 @@ export function AuthProvider({ children }) {
 
     let alive = true
 
-    const applySession = async (nextSession) => {
+    const applySession = async (nextSession, event = 'INITIAL_SESSION') => {
       if (!alive) return
-      setSession(nextSession)
+      const nextUserId = nextSession?.user?.id || null
+      const currentUserId = sessionRef.current?.user?.id || null
 
-      if (!nextSession?.user) {
+      if (!nextUserId) {
+        sessionRef.current = null
+        setSession((current) => current === null ? current : null)
+        loadedProfileUserIdRef.current = null
+        profileRequestRef.current = null
         setProfile(null)
         setProfileError('')
         setLoading(false)
         return
       }
 
-      setLoading(true)
-      await loadProfile(nextSession.user.id)
+      const identityChanged = nextUserId !== currentUserId
+      const sessionNeedsUpdate = identityChanged || !sessionRef.current || event === 'USER_UPDATED'
+
+      // TOKEN_REFRESHED ocurre de forma habitual al recuperar una pestaña.
+      // Supabase actualiza internamente su token; no necesitamos propagar un
+      // nuevo objeto de sesión por todo React ni volver a montar la interfaz.
+      if (sessionNeedsUpdate) {
+        sessionRef.current = nextSession
+        setSession(nextSession)
+      }
+
+      if (!identityChanged && loadedProfileUserIdRef.current === nextUserId && event !== 'USER_UPDATED') {
+        return
+      }
+
+      // Solo mostramos la pantalla inicial cuando cambia la identidad o aún
+      // no se ha cargado el perfil. Un refresco de token no activa loading.
+      if (identityChanged || !loadedProfileUserIdRef.current) setLoading(true)
+      await loadProfile(nextUserId, { force: event === 'USER_UPDATED' })
       if (alive) setLoading(false)
     }
 
     supabase.auth.getSession().then(({ data, error }) => {
       if (error) setProfileError('No se ha podido recuperar la sesión.')
-      return applySession(data?.session ?? null)
+      return applySession(data?.session ?? null, 'INITIAL_SESSION')
     })
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      Promise.resolve().then(() => applySession(nextSession))
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // No ignoramos el evento: actualizamos el objeto de sesión, pero
+      // applySession evita recargar el perfil si el usuario no ha cambiado.
+      Promise.resolve().then(() => applySession(nextSession, event))
     })
 
     return () => {
@@ -166,6 +210,8 @@ export function AuthProvider({ children }) {
     }
   }, [session])
 
+  const refreshProfile = useCallback(() => (sessionRef.current?.user?.id ? loadProfile(sessionRef.current.user.id, { force: true }) : null), [loadProfile])
+
   const signOut = useCallback(async () => {
     if (!supabase) return
     const { error } = await supabase.auth.signOut()
@@ -181,8 +227,8 @@ export function AuthProvider({ children }) {
     signIn,
     changePassword,
     signOut,
-    refreshProfile: () => session?.user?.id ? loadProfile(session.user.id) : null,
-  }), [session, profile, loading, profileError, signIn, signOut, changePassword, loadProfile])
+    refreshProfile,
+  }), [session, profile, loading, profileError, signIn, signOut, changePassword, refreshProfile])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

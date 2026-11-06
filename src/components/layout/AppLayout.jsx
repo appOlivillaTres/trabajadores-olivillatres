@@ -1,6 +1,8 @@
 
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useState } from 'react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import FormDraftPersistence from './FormDraftPersistence'
+import { useEffect, useRef, useState } from 'react'
+import { clearSessionDrafts, disableSessionDraftRecovery } from '../../lib/sessionDrafts'
 import { useAuth } from '../../hooks/useAuth'
 import {
   canAccessSection,
@@ -11,6 +13,17 @@ import {
 export default function AppLayout() {
   const { profile, signOut, changePassword } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
+  const previousPathRef = useRef(location.pathname)
+
+  // Al cambiar de ruta dentro de la aplicación, se descartan los borradores
+  // temporales del apartado anterior. Se hace en un efecto, nunca durante render.
+  useEffect(() => {
+    if (previousPathRef.current === location.pathname) return
+    previousPathRef.current = location.pathname
+    disableSessionDraftRecovery()
+    clearSessionDrafts()
+  }, [location.pathname])
 
   const [error, setError] = useState('')
   const [signingOut, setSigningOut] = useState(false)
@@ -103,6 +116,7 @@ export default function AppLayout() {
 
   return (
     <div className="min-vh-100 bg-light">
+      <FormDraftPersistence userId={profile?.id} />
       <nav className="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
         <div className="container">
           <NavLink
