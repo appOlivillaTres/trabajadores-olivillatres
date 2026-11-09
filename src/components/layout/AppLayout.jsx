@@ -4,11 +4,7 @@ import FormDraftPersistence from './FormDraftPersistence'
 import { useEffect, useRef, useState } from 'react'
 import { clearSessionDrafts, disableSessionDraftRecovery } from '../../lib/sessionDrafts'
 import { useAuth } from '../../hooks/useAuth'
-import {
-  canAccessSection,
-  canManagePermissions,
-  SECTION,
-} from '../../lib/permissions'
+import {canAccessSection, canManagePermissions, SECTION,} from '../../lib/permissions'
 
 export default function AppLayout() {
   const { profile, signOut, changePassword } = useAuth()
