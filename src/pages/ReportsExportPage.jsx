@@ -510,7 +510,7 @@ export default function ReportsExportPage() {
         ? `olivillatres-informe-${monthValue}${safeWorker}.xlsx`
         : `olivillatres-informe-semana-${interval.fromDate}-${interval.toDate}${safeWorker}.xlsx`
       downloadWorkReportsWorkbook({ sheets, filename })
-      setNotice(`Excel generado para ${intervalLabel}. Incluye resumen diario, detalle por obra y horarios diarios sin duplicarlos por cada obra.`)
+      setNotice(`Excel generado para ${intervalLabel}. Incluye resumen diario, detalle por obra y horarios diarios.`)
     } catch (exportError) {
       const message = exportError.message || 'No se ha podido generar el informe.'
       setError(message.toLowerCase().includes('workday_schedules')
