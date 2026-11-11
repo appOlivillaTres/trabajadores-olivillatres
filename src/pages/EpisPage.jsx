@@ -218,8 +218,8 @@ export default function EpisPage() {
     const rows = blank
       ? [...PPE, 'Otros: __________________________________________'].map(name => `<tr><td style="height:28px">☐ ${escapeHtml(name)}</td><td></td><td></td><td></td></tr>`).join('')
       : lines.map(line => `<tr><td>${escapeHtml(line.item_name)}</td><td>${escapeHtml(line.size || '—')}</td><td>${line.quantity}</td><td>${line.is_initial ? 'Entrega inicial' : 'Reposición'} · ${escapeHtml(date)}</td></tr>`).join('')
-    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibí de equipos de protección individual y ropa de trabajo</title><style>
-      @page{size:A4;margin:12mm}
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Registro de entrega EPI y ropa</title><style>
+      @page{size:A4;margin:15mm}
       *{box-sizing:border-box}
       body{font:12px Arial,Helvetica,sans-serif;color:#111;margin:0}
       .brand{display:flex;justify-content:center;margin-bottom:10px}
@@ -250,8 +250,7 @@ export default function EpisPage() {
       }
     </style></head><body>
       <div class="brand"><img src="${logoOlivilla}" alt="Olivilla Tres"></div>
-      <h1>Recibí de equipos de protección individual y ropa de trabajo</h1>
-      <div class="section-title">GESTIÓN DE EPIS</div>
+      <h1>REGISTRO DE ENTREGA DE EQUIPOS DE PROTECCIÓN INDIVIDUAL (EPI) Y ROPA DE TRABAJO</h1>
       <p>OLIVILLA TRES, S.L.U., en cumplimiento de lo establecido en los artículos 14 y 17 de la Ley 31/1995, de Prevención de Riesgos Laborales, así como en el artículo 3 del Real Decreto 773/1997, hace entrega a:</p>
       <div class="meta">
         <div><b>Nombre y apellidos del trabajador:</b><br>${escapeHtml(workerName)}</div>
@@ -266,7 +265,7 @@ export default function EpisPage() {
         <li>Informar al mando directo de cualquier deterioro, anomalía o daño que haya sufrido el equipo y solicitar su reposición.</li>
       </ul>
       <p class="legal">La firma del trabajador acredita la recepción de los artículos relacionados y de la información e instrucciones correspondientes. El incumplimiento de las obligaciones de uso podrá tener las consecuencias previstas en el artículo 58.1 del Estatuto de los Trabajadores.</p>
-      <div class="sign"><div><b>Entregado por la empresa</b><div class="sign-space"></div>Nombre y firma:</div><div><b>Recibido por el trabajador</b><div class="sign-space"></div>Nombre y firma:</div></div>
+      <div class="sign"><div><b>Entregado por la empresa</b><div class="sign-space"></div>Firma:</div><div><b>Recibido por el trabajador</b><div class="sign-space"></div>Firma:</div></div>
       <script>window.onload=()=>window.print()</script></body></html>`
     const win = window.open('', '_blank')
     if (!win) { setNotice('El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para este sitio.'); return }
