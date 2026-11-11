@@ -218,7 +218,56 @@ export default function EpisPage() {
     const rows = blank
       ? [...PPE, 'Otros: __________________________________________'].map(name => `<tr><td style="height:28px">☐ ${escapeHtml(name)}</td><td></td><td></td><td></td></tr>`).join('')
       : lines.map(line => `<tr><td>${escapeHtml(line.item_name)}</td><td>${escapeHtml(line.size || '—')}</td><td>${line.quantity}</td><td>${line.is_initial ? 'Entrega inicial' : 'Reposición'} · ${escapeHtml(date)}</td></tr>`).join('')
-    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Registro de entrega EPI y ropa</title><style>@page{size:A4;margin:8mm}body{font:10px Arial,sans-serif;color:#111;margin:0}.brand{display:flex;justify-content:center;margin-bottom:5px}.brand img{width:185px;max-width:55%;height:auto;object-fit:contain}h1{text-align:center;font-size:15px;margin:5px 0 7px}p{line-height:1.2;margin:6px 0}.meta{display:flex;gap:18px;margin:8px 0}.meta div{flex:1;border-bottom:1px solid #888;padding-bottom:5px}table{border-collapse:collapse;width:100%;margin:7px 0}th,td{border:1px solid #777;padding:4px;text-align:left}th{background:#eee}.sign{display:flex;gap:24px;margin-top:8px;page-break-inside:avoid}.sign div{flex:1;padding-top:0;min-height:32px;line-height:1.2}.sign-space{height:10px}.legal{margin-top:6px;font-size:8px}@media print{body{margin:0}table{margin:6px 0}th,td{padding:3px}.sign{margin-top:7px}.sign div{min-height:28px}.sign-space{height:8px}}</style></head><body><div class="brand"><img src="${logoOlivilla}" alt="Olivilla Tres"></div><h1>REGISTRO DE ENTREGA DE EQUIPOS DE PROTECCIÓN INDIVIDUAL (EPI) Y ROPA DE TRABAJO</h1><p>En cumplimiento del Artículo 17 de la Ley 31/1995 de Prevención de Riesgos Laborales y del Real Decreto 773/1997 sobre la utilización de equipos de protección individual.</p><div class="meta"><div><b>Trabajador:</b><br>${escapeHtml(workerName)}</div><div><b>DNI / NIE:</b><br>${escapeHtml(!blank ? (selectedWorker?.dni || '________________') : '________________')}</div><div><b>Fecha:</b><br>${blank ? '________________' : escapeHtml(date)}</div></div><p>El trabajador abajo firmante declara haber recibido por parte de la empresa, de forma gratuita, los equipos de protección individual y/o ropa de trabajo que se relacionan a continuación, en correcto estado de utilización. Mediante su firma se compromete a utilizarlos y cuidarlos correctamente, informar de daños o defectos y solicitar su sustitución cuando corresponda.</p><table><thead><tr><th>Equipo / artículo</th><th>Talla</th><th>Cantidad</th><th>Motivo / fecha</th></tr></thead><tbody>${rows}</tbody></table><p>La firma acredita la recepción del material indicado y la información básica sobre su utilización y cuidado.</p><div class="sign"><div>Entregado por la empresa<div class="sign-space"></div>Firma:</div><div>Recibido por el trabajador<div class="sign-space"></div>Firma:</div></div><p class="legal">Los datos personales de este documento se utilizarán para gestionar y acreditar la entrega de equipos y ropa de trabajo, conforme a la normativa de protección de datos aplicable.</p><script>window.onload=()=>window.print()</script></body></html>`
+    const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Recibí de equipos de protección individual y ropa de trabajo</title><style>
+      @page{size:A4;margin:12mm}
+      *{box-sizing:border-box}
+      body{font:12px Arial,Helvetica,sans-serif;color:#111;margin:0}
+      .brand{display:flex;justify-content:center;margin-bottom:10px}
+      .brand img{width:260px;max-width:68%;height:auto;object-fit:contain}
+      h1{text-align:center;font-size:18px;line-height:1.2;margin:7px 0 5px;text-transform:uppercase}
+      .section-title{text-align:center;font-size:12px;font-weight:700;letter-spacing:.5px;margin:0 0 12px}
+      p{font-size:12px;line-height:1.35;margin:9px 0}
+      .meta{display:flex;gap:24px;margin:16px 0}
+      .meta div{flex:1;min-width:0;border-bottom:1px solid #888;padding-bottom:7px;line-height:1.35}
+      table{border-collapse:collapse;width:100%;margin:13px 0}
+      th,td{border:1px solid #777;padding:6px;text-align:left;font-size:11px;line-height:1.2}
+      th{background:#eee;text-align:center}
+      td:first-child{width:40%}
+      .duties{margin:7px 0 8px;padding-left:22px}
+      .duties li{font-size:11px;line-height:1.3;margin:5px 0}
+      .sign{display:flex;gap:34px;margin-top:20px;page-break-inside:avoid;break-inside:avoid}
+      .sign>div{flex:1;min-height:52px;line-height:1.35}
+      .sign-space{height:20px}
+      .legal{margin-top:10px;font-size:10px;line-height:1.25}
+      @media print{
+        body{margin:0}
+        table{margin:11px 0}
+        th,td{padding:5px}
+        .sign{margin-top:17px}
+        .sign>div{min-height:48px}
+        .sign-space{height:17px}
+        tr{break-inside:avoid}
+      }
+    </style></head><body>
+      <div class="brand"><img src="${logoOlivilla}" alt="Olivilla Tres"></div>
+      <h1>Recibí de equipos de protección individual y ropa de trabajo</h1>
+      <div class="section-title">GESTIÓN DE EPIS</div>
+      <p>OLIVILLA TRES, S.L.U., en cumplimiento de lo establecido en los artículos 14 y 17 de la Ley 31/1995, de Prevención de Riesgos Laborales, así como en el artículo 3 del Real Decreto 773/1997, hace entrega a:</p>
+      <div class="meta">
+        <div><b>Nombre y apellidos del trabajador:</b><br>${escapeHtml(workerName)}</div>
+        <div><b>DNI / NIE:</b><br>${escapeHtml(!blank ? (selectedWorker?.dni || '________________') : '________________')}</div>
+        <div><b>Fecha:</b><br>${blank ? '________________' : escapeHtml(date)}</div>
+      </div>
+      <p>de los siguientes equipos de protección individual y/o ropa de trabajo, así como de las hojas de instrucciones de uso y mantenimiento correspondientes:</p>
+      <table><thead><tr><th>Equipo / artículo</th><th>Especificaciones técnicas / talla</th><th>Cantidad</th><th>Fecha / tipo de entrega</th></tr></thead><tbody>${rows}</tbody></table>
+      <p>Se informa al trabajador de la obligación, conforme al artículo 29 de la Ley de Prevención de Riesgos Laborales, de utilizar los equipos entregados por OLIVILLA TRES, S.L.U. para los trabajos en los que se hayan establecido estas medidas de protección:</p>
+      <ul class="duties">
+        <li>Utilizar, mantener y conservar correctamente los equipos de protección individual proporcionados, de acuerdo con las respectivas hojas de instrucciones.</li>
+        <li>Informar al mando directo de cualquier deterioro, anomalía o daño que haya sufrido el equipo y solicitar su reposición.</li>
+      </ul>
+      <p class="legal">La firma del trabajador acredita la recepción de los artículos relacionados y de la información e instrucciones correspondientes. El incumplimiento de las obligaciones de uso podrá tener las consecuencias previstas en el artículo 58.1 del Estatuto de los Trabajadores.</p>
+      <div class="sign"><div><b>Entregado por la empresa</b><div class="sign-space"></div>Nombre y firma:</div><div><b>Recibido por el trabajador</b><div class="sign-space"></div>Nombre y firma:</div></div>
+      <script>window.onload=()=>window.print()</script></body></html>`
     const win = window.open('', '_blank')
     if (!win) { setNotice('El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes para este sitio.'); return }
     win.document.write(html); win.document.close()
