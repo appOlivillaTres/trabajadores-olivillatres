@@ -5,11 +5,15 @@ import { canAccessSection, SECTION } from '../lib/permissions'
 
 export default function WorksitesPage() {
   const { profile } = useAuth()
-  const { worksites, loading, saving, updatingId, error, loadWorksites, createWorksite, changeWorksiteStatus } = useWorksites()
+  const { worksites, loading, saving, updatingId, error, loadWorksites, createWorksite, changeWorksiteStatus, updateWorksite, deleteWorksite } = useWorksites()
   const [name, setName] = useState('')
   const [address, setAddress] = useState('')
   const [formMessage, setFormMessage] = useState('')
   const [activeTab, setActiveTab] = useState('active')
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
+  const [editAddress, setEditAddress] = useState('')
+  const [actionMessage, setActionMessage] = useState('')
 
   const activeWorksites = useMemo(() => worksites.filter((worksite) => worksite.active), [worksites])
   const completedWorksites = useMemo(() => worksites.filter((worksite) => !worksite.active), [worksites])
@@ -32,12 +36,43 @@ export default function WorksitesPage() {
     }
   }
 
+  function startEditing(worksite) {
+    setActionMessage('')
+    setEditingId(worksite.id)
+    setEditName(worksite.name)
+    setEditAddress(worksite.address ?? '')
+  }
+
+  async function handleUpdate(event, worksiteId) {
+    event.preventDefault()
+    setActionMessage('')
+    try {
+      await updateWorksite(worksiteId, { name: editName, address: editAddress })
+      setEditingId(null)
+      setActionMessage('La obra se ha modificado correctamente.')
+    } catch {
+      // El hook muestra el error en la página.
+    }
+  }
+
+  async function handleDelete(worksite) {
+    const confirmed = window.confirm(`¿Seguro que quieres eliminar la obra «${worksite.name}»? Esta acción no se puede deshacer.`)
+    if (!confirmed) return
+    setActionMessage('')
+    try {
+      await deleteWorksite(worksite.id)
+      setActionMessage(`La obra «${worksite.name}» se ha eliminado.`)
+    } catch {
+      // El hook muestra el motivo por el que no se puede eliminar.
+    }
+  }
+
   return (
     <>
       <div className="mb-4">
         <p className="text-success text-uppercase small fw-semibold mb-1">Administración</p>
         <h1 className="h2 fw-bold mb-2">Obras</h1>
-        <p className="text-secondary mb-0">Crea las obras disponibles para los partes de trabajo y desactiva las que ya no estén en uso.</p>
+        <p className="text-secondary mb-0">Crea y modifica las obras disponibles para los partes de trabajo. Las obras con partes asociados se conservan para proteger el historial.</p>
       </div>
 
       <div className="row g-4 align-items-start">
@@ -73,6 +108,7 @@ export default function WorksitesPage() {
               </div>
 
               {error && <div className="alert alert-danger" role="alert">{error}</div>}
+              {actionMessage && <div className="alert alert-success py-2" role="status">{actionMessage}</div>}
 
               <ul className="nav nav-tabs mb-3" role="tablist" aria-label="Filtrar obras por estado">
                 <li className="nav-item" role="presentation">
@@ -101,9 +137,36 @@ export default function WorksitesPage() {
                     <tbody>
                       {visibleWorksites.map((worksite) => (
                         <tr key={worksite.id}>
-                          <td><div className="fw-semibold">{worksite.name}</div>{worksite.address && <div className="small text-secondary">{worksite.address}</div>}</td>
+                          <td>
+                            {editingId === worksite.id ? (
+                              <form onSubmit={(event) => void handleUpdate(event, worksite.id)}>
+                                <div className="mb-2">
+                                  <label className="form-label small mb-1" htmlFor={`edit-worksite-name-${worksite.id}`}>Nombre</label>
+                                  <input id={`edit-worksite-name-${worksite.id}`} className="form-control form-control-sm" value={editName} onChange={(event) => setEditName(event.target.value)} maxLength={120} required autoFocus />
+                                </div>
+                                <div className="mb-2">
+                                  <label className="form-label small mb-1" htmlFor={`edit-worksite-address-${worksite.id}`}>Dirección (opcional)</label>
+                                  <input id={`edit-worksite-address-${worksite.id}`} className="form-control form-control-sm" value={editAddress} onChange={(event) => setEditAddress(event.target.value)} maxLength={250} />
+                                </div>
+                                <div className="d-flex flex-wrap gap-1">
+                                  <button type="submit" className="btn btn-success btn-sm" disabled={updatingId === worksite.id || !editName.trim()}>{updatingId === worksite.id ? 'Guardando...' : 'Guardar'}</button>
+                                  <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setEditingId(null)} disabled={updatingId === worksite.id}>Cancelar</button>
+                                </div>
+                              </form>
+                            ) : (
+                              <><div className="fw-semibold">{worksite.name}</div>{worksite.address && <div className="small text-secondary">{worksite.address}</div>}</>
+                            )}
+                          </td>
                           <td><span className={`badge ${worksite.active ? 'text-bg-success' : 'text-bg-secondary'}`}>{worksite.active ? 'Activa' : 'Terminada'}</span></td>
-                          <td className="text-end"><button type="button" className={`btn btn-sm ${worksite.active ? 'btn-outline-danger' : 'btn-outline-success'}`} disabled={updatingId === worksite.id} onClick={() => void changeWorksiteStatus(worksite.id, !worksite.active)}>{updatingId === worksite.id ? 'Guardando...' : worksite.active ? 'Marcar terminada' : 'Reactivar'}</button></td>
+                          <td className="text-end">
+                            {editingId === worksite.id ? null : (
+                              <div className="d-flex flex-wrap justify-content-end gap-1">
+                                <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => startEditing(worksite)} disabled={updatingId === worksite.id}>Modificar</button>
+                                <button type="button" className={`btn btn-sm ${worksite.active ? 'btn-outline-danger' : 'btn-outline-success'}`} disabled={updatingId === worksite.id} onClick={() => void changeWorksiteStatus(worksite.id, !worksite.active)}>{updatingId === worksite.id ? 'Guardando...' : worksite.active ? 'Marcar terminada' : 'Reactivar'}</button>
+                                <button type="button" className="btn btn-outline-danger btn-sm" disabled={updatingId === worksite.id} onClick={() => void handleDelete(worksite)}>Eliminar</button>
+                              </div>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>

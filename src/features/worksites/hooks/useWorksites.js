@@ -3,6 +3,8 @@ import {
   createWorksite as createWorksiteService,
   getWorksites as getWorksitesService,
   updateWorksiteStatus,
+  updateWorksite as updateWorksiteService,
+  deleteWorksite as deleteWorksiteService,
 } from '../services/worksitesService'
 
 export function useWorksites() {
@@ -40,6 +42,36 @@ export function useWorksites() {
     }
   }, [loadWorksites])
 
+  const update = useCallback(async (id, values) => {
+    setUpdatingId(id)
+    setError('')
+    try {
+      const updated = await updateWorksiteService(id, values)
+      setWorksites((current) => current.map((worksite) => worksite.id === id ? updated : worksite)
+        .sort((a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name, 'es')))
+      return updated
+    } catch (updateError) {
+      setError(updateError.message || 'No se ha podido modificar la obra.')
+      throw updateError
+    } finally {
+      setUpdatingId(null)
+    }
+  }, [])
+
+  const remove = useCallback(async (id) => {
+    setUpdatingId(id)
+    setError('')
+    try {
+      await deleteWorksiteService(id)
+      setWorksites((current) => current.filter((worksite) => worksite.id !== id))
+    } catch (deleteError) {
+      setError(deleteError.message || 'No se ha podido eliminar la obra.')
+      throw deleteError
+    } finally {
+      setUpdatingId(null)
+    }
+  }, [])
+
   const changeStatus = useCallback(async (id, active) => {
     setUpdatingId(id)
     setError('')
@@ -55,5 +87,5 @@ export function useWorksites() {
     }
   }, [])
 
-  return { worksites, loading, saving, updatingId, error, loadWorksites, createWorksite: create, changeWorksiteStatus: changeStatus }
+  return { worksites, loading, saving, updatingId, error, loadWorksites, createWorksite: create, changeWorksiteStatus: changeStatus, updateWorksite: update, deleteWorksite: remove }
 }
