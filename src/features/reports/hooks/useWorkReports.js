@@ -33,8 +33,8 @@ export function useWorkReports() {
     setSaving(true)
     setError('')
     try {
-      const reportId = await createWorkReportService(values)
-      return reportId
+      const result = await createWorkReportService(values)
+      return result
     } catch (createError) {
       setError(createError.message || 'No se ha podido guardar el parte.')
       throw createError

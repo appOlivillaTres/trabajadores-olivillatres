@@ -389,7 +389,7 @@ export default function WorkReportPage() {
     setFormError('')
 
     try {
-      await createWorkReport({
+      const saveResult = await createWorkReport({
         workDate,
         schedule: profile?.role === 'worker'
           ? { ...schedule, dirty: scheduleDirty }
@@ -412,7 +412,7 @@ export default function WorkReportPage() {
       setScheduleDirty(false)
       setFormError('')
       clearError()
-      setSuccessMessage(`Parte diario guardado correctamente: ${savedBlockCount} ${savedBlockCount === 1 ? 'bloque de obra' : 'bloques de obra'}. Para añadir o corregir algo más en esta fecha, solicita una modificación desde «Mis partes».`)
+      setSuccessMessage(`Parte diario guardado correctamente: ${savedBlockCount} ${savedBlockCount === 1 ? 'bloque de obra' : 'bloques de obra'}. Para añadir o corregir algo más en esta fecha, solicita una modificación desde «Mis partes».${saveResult?.scheduleSyncWarning ?? ''}`)
     } catch {
       // useWorkReports muestra el error del servidor en la pantalla.
     }

@@ -17,16 +17,6 @@ function formatLongDate(value) {
   }).format(new Date(year, month - 1, day))
 }
 
-function getTabFromStatus(groups, reportId, nextStatus) {
-  const affectedGroup = groups.find((item) => item.reports.some((report) => report.id === reportId))
-  if (!affectedGroup) return nextStatus === 'needs_changes' ? 'corrections' : nextStatus === 'approved' ? 'reviewed' : 'pending'
-
-  const statuses = affectedGroup.reports.map((report) => report.id === reportId ? nextStatus : report.review_status)
-  if (statuses.includes('needs_changes')) return 'corrections'
-  if (statuses.length > 0 && statuses.every((status) => status === 'approved')) return 'reviewed'
-  return 'pending'
-}
-
 function groupByDate(groups) {
   const byDate = new Map()
   for (const group of groups) {
@@ -75,9 +65,8 @@ export default function ReviewsPage() {
       : correctionGroups
 
   async function handleReviewStatusChange(reportId, status) {
-    const targetTab = getTabFromStatus(dayGroups, reportId, status)
-    const succeeded = await changeStatus(reportId, status)
-    if (succeeded) setActiveTab(targetTab)
+    // Cambiar el estado del parte no debe modificar la pestaña seleccionada.
+    await changeStatus(reportId, status)
   }
 
   function handleSearch(event) {

@@ -123,7 +123,23 @@ export async function createWorkReport({ workDate, entries, schedule = null }) {
     }
     throw error
   }
-  return data
+
+  let scheduleSyncWarning = ''
+  if (cleanWorkdaySchedule) {
+    const workerIds = [...new Set(cleanEntries.flatMap((entry) => entry.workers.map((worker) => worker.worker_id)))]
+    const { error: scheduleSyncError } = await client.rpc('sync_workday_schedule_for_report_day', {
+      p_work_date: workDate,
+      p_worker_ids: workerIds,
+      p_entry_time: cleanWorkdaySchedule.entry_time,
+      p_exit_time: cleanWorkdaySchedule.exit_time,
+    })
+
+    if (scheduleSyncError) {
+      scheduleSyncWarning = ' El parte se ha guardado, pero no se ha podido copiar el horario a todos los compañeros. Instala la migración SQL incluida y vuelve a revisar ese día.'
+    }
+  }
+
+  return { data, scheduleSyncWarning }
 }
 
 // Permite al administrador guardar el horario diario de un trabajador concreto.
