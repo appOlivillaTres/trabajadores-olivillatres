@@ -18,9 +18,10 @@ import EpisPage from '../pages/EpisPage'
 import ClothingStockPage from '../pages/ClothingStockPage'
 import ForbiddenPage from '../pages/ForbiddenPage'
 import NotFoundPage from '../pages/NotFoundPage'
+import PurchasesPage from '../pages/PurchasesPage'
 import { SECTION } from '../lib/permissions'
 export default function AppRouter() {
- return <Routes><Route path="/login" element={<LoginPage/>}/><Route element={<ProtectedRoute/>}><Route element={<AppLayout/>}><Route index element={<Navigate to="/panel" replace/>}/><Route path="panel" element={<PanelPage/>}/><Route path="dashboard" element={<Navigate to="/panel" replace/>}/><Route path="parte" element={<WorkReportPage/>}/><Route path="mis-partes" element={<MyReportsPage/>}/><Route path="sin-permiso" element={<ForbiddenPage/>}/>
+ return <Routes><Route path="/login" element={<LoginPage/>}/><Route element={<ProtectedRoute/>}><Route element={<AppLayout/>}><Route index element={<Navigate to="/panel" replace/>}/><Route path="panel" element={<PanelPage/>}/><Route path="dashboard" element={<Navigate to="/panel" replace/>}/><Route path="parte" element={<WorkReportPage/>}/><Route path="mis-partes" element={<MyReportsPage/>}/><Route path="sin-permiso" element={<ForbiddenPage/>}/><Route path="compras" element={<PurchasesPage/>}/>
  <Route element={<ProtectedRoute requiredSection={SECTION.PARTS}/> }><Route path="usuarios" element={<EmployeesPage/>}/><Route path="partes-panel" element={<DashboardPage/>}/><Route path="obras" element={<WorksitesPage/>}/><Route path="revisiones" element={<ReviewsPage/>}/><Route path="ausencias" element={<AbsencesPage/>}/><Route path="exportar" element={<ReportsExportPage/>}/></Route>
  <Route element={<ProtectedRoute requiredSection={SECTION.WORKERS}/> }><Route path="trabajadores" element={<WorkerRecordsPage/>}/></Route>
  <Route element={<ProtectedRoute requiredSection={SECTION.VEHICLES}/> }><Route path="vehiculos" element={<VehiclesPage/>}/></Route>

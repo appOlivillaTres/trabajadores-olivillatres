@@ -4,6 +4,7 @@ import FormDraftPersistence from './FormDraftPersistence'
 import { useEffect, useRef, useState } from 'react'
 import { clearSessionDrafts, disableSessionDraftRecovery } from '../../lib/sessionDrafts'
 import { useAuth } from '../../hooks/useAuth'
+import { supabase } from '../../lib/supabase'
 import {
   canAccessSection,
   canManagePermissions,
@@ -41,6 +42,23 @@ export default function AppLayout() {
   const canVehicles = canAccessSection(profile, SECTION.VEHICLES)
   const canEpisRopa = canAccessSection(profile, SECTION.EPIS_ROPA)
   const canPermissions = canManagePermissions(profile)
+  const canRequestPurchases = canAccessSection(profile, SECTION.PURCHASES_REQUEST)
+  const canManagePurchases = canAccessSection(profile, SECTION.PURCHASES_MANAGE)
+  const [pendingPurchases, setPendingPurchases] = useState(0)
+
+  useEffect(() => {
+    if (!canManagePurchases || !supabase) { setPendingPurchases(0); return undefined }
+    let active = true
+    const refreshPending = async () => {
+      const { count, error: countError } = await supabase.from('purchase_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      if (active && !countError) setPendingPurchases(count || 0)
+    }
+    void refreshPending()
+    const channel = supabase.channel('purchase-pending-count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'purchase_requests' }, () => { void refreshPending() })
+      .subscribe()
+    return () => { active = false; supabase.removeChannel(channel) }
+  }, [canManagePurchases])
 
   const linkClass = ({ isActive }) =>
     `nav-link ${isActive ? 'active fw-semibold' : ''}`
@@ -324,16 +342,24 @@ export default function AppLayout() {
                     </div>
                   )}
 
-                  {canPermissions && (
-                    <NavLink
-                      className={linkClass}
-                      to="/usuarios-permisos"
-                      onClick={closeMenu}
-                    >
-                      Permisos
-                    </NavLink>
-                  )}
                 </>
+              )}
+              {(canRequestPurchases || canManagePurchases) && (
+                <NavLink className={linkClass} to="/compras" onClick={closeMenu}>
+                  Compras
+                  {canManagePurchases && pendingPurchases > 0 && (
+                    <span className="badge rounded-pill text-bg-warning ms-2">{pendingPurchases}</span>
+                  )}
+                </NavLink>
+              )}
+              {canPermissions && (
+                <NavLink
+                  className={linkClass}
+                  to="/usuarios-permisos"
+                  onClick={closeMenu}
+                >
+                  Permisos
+                </NavLink>
               )}
             </div>
 
