@@ -64,3 +64,16 @@ export async function updatePurchaseStatus(id, payload, expectedStatus = 'pendin
   if (error) throw error
   if (!data) throw new Error('La solicitud ya ha sido gestionada por otra persona. Actualiza la lista.')
 }
+
+
+// Eliminación definitiva reservada a usuarios con permiso de gestión de compras.
+export async function deletePurchaseRequest(id) {
+  const { data, error } = await client().from('purchase_requests')
+    .delete()
+    .eq('id', id)
+    .select('id')
+    .maybeSingle()
+  if (error) throw error
+  if (!data) throw new Error('No se pudo eliminar la solicitud. Comprueba que tienes el permiso «Gestionar compras» y que la migración SQL está aplicada.')
+  return data
+}

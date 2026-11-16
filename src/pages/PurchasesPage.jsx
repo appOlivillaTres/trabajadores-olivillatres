@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { canAccessSection, SECTION } from '../lib/permissions'
 import { getWorksites } from '../features/worksites/services/worksitesService'
 import {
-  cancelPurchaseRequest, createPurchaseRequest, listPurchaseRequests,
+  cancelPurchaseRequest, createPurchaseRequest, deletePurchaseRequest, listPurchaseRequests,
   updatePurchaseRequest, updatePurchaseStatus,
 } from '../features/purchases/services/purchaseRequestsService'
 
@@ -157,6 +157,25 @@ export default function PurchasesPage() {
     finally { setSaving(false) }
   }
 
+  async function deleteRequest(request) {
+    const confirmed = window.confirm(
+      `¿Eliminar definitivamente la solicitud de «${request.worksite_name || 'obra sin nombre'}»?\n\n` +
+      'Esta acción no se puede deshacer. Se eliminará también si ya está pedida, recibida o rechazada.'
+    )
+    if (!confirmed) return
+    setSaving(true)
+    setNotice(null)
+    try {
+      await deletePurchaseRequest(request.id)
+      setRequests((current) => current.filter((item) => item.id !== request.id))
+      if (editingId === request.id) resetForm()
+      if (reviewingId === request.id) setReviewingId(null)
+      setNotice({ type: 'success', text: 'Solicitud eliminada definitivamente.' })
+    } catch (error) {
+      setNotice({ type: 'danger', text: error.message || 'No se pudo eliminar la solicitud.' })
+    } finally { setSaving(false) }
+  }
+
   if (!canSee) return <div className="alert alert-danger">No tienes permiso para acceder a Compras.</div>
 
   return <>
@@ -246,6 +265,11 @@ export default function PurchasesPage() {
                 {canManage && <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => startReview(request, 'rejected')} disabled={saving}>Rechazar</button>}
               </div>}
               {tab === 'reviewed' && canManage && request.status === 'ordered' && <div className="mt-3"><button type="button" className="btn btn-sm btn-success" onClick={() => void markReceived(request)} disabled={saving}>Marcar como recibido</button></div>}
+              {canManage && <div className="d-flex justify-content-end mt-3">
+                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => void deleteRequest(request)} disabled={saving} title="Eliminar definitivamente esta solicitud">
+                  Eliminar solicitud
+                </button>
+              </div>}
               {reviewingId === request.id && <form className="border-top mt-3 pt-3" onSubmit={(e) => void submitReview(e, request)}>
                 {reviewForm.action === 'ordered' ? <div className="row g-2"><div className="col-12 col-md-6"><label className="form-label small">Fecha del pedido *</label><input type="date" className="form-control" value={reviewForm.orderedAt} onChange={(e) => setReviewForm((v) => ({ ...v, orderedAt: e.target.value }))} required /></div><div className="col-12 col-md-6"><label className="form-label small">Fecha prevista de llegada</label><input type="date" className="form-control" value={reviewForm.expectedAt} onChange={(e) => setReviewForm((v) => ({ ...v, expectedAt: e.target.value }))} /></div></div> : <div><label className="form-label small">Motivo del rechazo *</label><textarea className="form-control" rows={2} value={reviewForm.reason} onChange={(e) => setReviewForm((v) => ({ ...v, reason: e.target.value }))} required /></div>}
                 <div className="d-flex gap-2 mt-3"><button type="submit" className="btn btn-primary btn-sm" disabled={saving}>{saving ? 'Guardando…' : 'Confirmar'}</button><button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => setReviewingId(null)} disabled={saving}>Cancelar</button></div>
