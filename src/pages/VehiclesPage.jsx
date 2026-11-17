@@ -11,6 +11,8 @@ const DOCUMENTS = [
   { key: 'circulation_permit_pdf_path', label: 'Permiso de circulación (PDF)' },
 ]
 
+const safeTrim = (value) => String(value ?? '').trim()
+
 function safeFileName(name) {
   return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100)
 }
@@ -71,14 +73,14 @@ export default function VehiclesPage() {
     event.preventDefault(); setNotice(null); setSaving(true)
     let vehicleId = editing !== 'new' ? editing : null
     try {
-      if (!form.registration.trim() || !form.brand.trim() || !form.model.trim()) throw new Error('Matrícula, marca y modelo son obligatorios.')
+      if (!safeTrim(form.registration) || !safeTrim(form.brand) || !safeTrim(form.model)) throw new Error('Matrícula, marca y modelo son obligatorios.')
       const { data: authData, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
       const payload = {
-        registration: form.registration.trim().toUpperCase().replace(/\s+/g, ' '),
-        brand: form.brand.trim(), model: form.model.trim(),
-        insurance_company: form.insurance_company.trim() || null,
-        policy_number: form.policy_number.trim() || null,
+        registration: safeTrim(form.registration).toUpperCase().replace(/\s+/g, ' '),
+        brand: safeTrim(form.brand), model: safeTrim(form.model),
+        insurance_company: safeTrim(form.insurance_company) || null,
+        policy_number: safeTrim(form.policy_number) || null,
         itv_expiry_date: form.itv_expiry_date || null,
         insurance_expiry_date: form.insurance_expiry_date || null,
         termination_date: form.termination_date || null,
@@ -95,22 +97,27 @@ export default function VehiclesPage() {
       }
       const oldVehicle = vehicles.find((item) => item.id === vehicleId)
       const docPatch = {}
+      const oldPathsToRemove = []
       for (const doc of DOCUMENTS) {
         const uploaded = await uploadPdf(vehicleId, doc.key, files[doc.key])
         if (uploaded) {
           docPatch[doc.key] = uploaded
-          if (oldVehicle?.[doc.key]) {
-            const { error } = await supabase.storage.from(BUCKET).remove([oldVehicle[doc.key]])
-            if (error) throw error
-          }
+          if (oldVehicle?.[doc.key]) oldPathsToRemove.push(oldVehicle[doc.key])
         }
       }
       if (Object.keys(docPatch).length) {
         const { error } = await supabase.from('vehicles').update(docPatch).eq('id', vehicleId)
         if (error) throw error
       }
+      let documentCleanupWarning = false
+      if (oldPathsToRemove.length) {
+        const { error } = await supabase.storage.from(BUCKET).remove(oldPathsToRemove)
+        documentCleanupWarning = Boolean(error)
+      }
       setEditing(null); setFiles({})
-      setNotice({ type: 'success', text: editing === 'new' ? 'Vehículo dado de alta correctamente.' : 'Vehículo guardado correctamente.' })
+      setNotice(documentCleanupWarning
+        ? { type: 'warning', text: 'El vehículo se ha guardado, pero no se pudieron borrar uno o varios PDF antiguos del almacenamiento.' }
+        : { type: 'success', text: editing === 'new' ? 'Vehículo dado de alta correctamente.' : 'Vehículo guardado correctamente.' })
       await load()
     } catch (error) {
       setNotice({ type: 'danger', text: error.message || 'No se ha podido guardar el vehículo.' })
@@ -129,6 +136,26 @@ export default function VehiclesPage() {
     finally { setDocumentBusy('') }
   }
 
+  async function removeDocument(vehicle, key) {
+    const path = vehicle?.[key]
+    if (!path) return
+    const label = DOCUMENTS.find((item) => item.key === key)?.label || 'documento'
+    if (!window.confirm(`¿Eliminar definitivamente el PDF «${label}» del vehículo ${vehicle.registration}?`)) return
+    setDocumentBusy(`${vehicle.id}-${key}`)
+    setNotice(null)
+    try {
+      const { error: updateError } = await supabase.from('vehicles').update({ [key]: null }).eq('id', vehicle.id)
+      if (updateError) throw updateError
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([path])
+      setVehicles((current) => current.map((item) => item.id === vehicle.id ? { ...item, [key]: null } : item))
+      setNotice(storageError
+        ? { type: 'warning', text: 'El PDF se ha desvinculado de la ficha, pero no se pudo borrar el archivo del almacenamiento.' }
+        : { type: 'success', text: 'PDF eliminado correctamente.' })
+    } catch (error) {
+      setNotice({ type: 'danger', text: error.message || 'No se ha podido eliminar el PDF.' })
+    } finally { setDocumentBusy('') }
+  }
+
   async function toggleArchive(vehicle) {
     const isArchived = Boolean(vehicle.termination_date)
     const date = isArchived ? null : new Date().toISOString().slice(0, 10)
@@ -138,6 +165,30 @@ export default function VehiclesPage() {
     const { error } = await supabase.from('vehicles').update({ termination_date: date }).eq('id', vehicle.id)
     if (error) setNotice({ type: 'danger', text: error.message || 'No se ha podido cambiar el estado.' })
     else { setNotice({ type: 'success', text: isArchived ? 'Vehículo reactivado.' : 'Vehículo dado de baja y archivado.' }); await load() }
+  }
+
+  async function deleteVehicle(vehicle) {
+    if (!window.confirm(`¿Eliminar definitivamente el vehículo ${vehicle.registration} y su documentación? Esta acción no se puede deshacer.`)) return
+    setNotice(null)
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('vehicles').delete().eq('id', vehicle.id)
+      if (error) throw error
+      const paths = DOCUMENTS.map((doc) => vehicle[doc.key]).filter(Boolean)
+      if (paths.length) {
+        const { error: storageError } = await supabase.storage.from(BUCKET).remove(paths)
+        if (storageError) {
+          setNotice({ type: 'warning', text: 'El vehículo se eliminó, pero no se pudieron borrar todos sus PDF del almacenamiento.' })
+        } else {
+          setNotice({ type: 'success', text: 'Vehículo eliminado definitivamente.' })
+        }
+      } else {
+        setNotice({ type: 'success', text: 'Vehículo eliminado definitivamente.' })
+      }
+      setVehicles((current) => current.filter((item) => item.id !== vehicle.id))
+    } catch (error) {
+      setNotice({ type: 'danger', text: error.message || 'No se ha podido eliminar el vehículo.' })
+    } finally { setSaving(false) }
   }
 
   return <>
@@ -168,7 +219,7 @@ export default function VehiclesPage() {
             <label className="form-label" htmlFor={doc.key}>{doc.label}</label>
             <input id={doc.key} className="form-control" type="file" accept="application/pdf,.pdf" onChange={(event) => setFiles((existing) => ({ ...existing, [doc.key]: event.target.files?.[0] || null }))} />
             <div className="form-text">PDF, máximo 10 MB. {current?.[doc.key] ? 'Ya hay un documento guardado; subir otro lo sustituirá.' : ''}</div>
-            {current?.[doc.key] && <button type="button" className="btn btn-sm btn-outline-primary mt-2" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => openDocument(current, doc.key)}>{documentBusy === `${editing}-${doc.key}` ? 'Abriendo…' : 'Ver PDF actual'}</button>}
+            {current?.[doc.key] && <div className="d-flex flex-wrap gap-2 mt-2"><button type="button" className="btn btn-sm btn-outline-primary" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => openDocument(current, doc.key)}>{documentBusy === `${editing}-${doc.key}` ? 'Abriendo…' : 'Ver PDF actual'}</button><button type="button" className="btn btn-sm btn-outline-danger" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => removeDocument(current, doc.key)}>Eliminar PDF</button></div>}
           </div>
         })}
         <div className="col-12 mt-4"><h3 className="h6 border-bottom pb-2 mb-1">Estado del vehículo</h3></div>
@@ -179,7 +230,7 @@ export default function VehiclesPage() {
 
     {!editing && <div className="card border-0 shadow-sm"><div className="card-body p-3 p-md-4">
       <div className="d-flex flex-column flex-md-row gap-2 mb-3"><div className="btn-group" role="group" aria-label="Estado de vehículos"><button className={`btn ${!archive ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setArchive(false)}>Activos</button><button className={`btn ${archive ? 'btn-success' : 'btn-outline-success'}`} onClick={() => setArchive(true)}>Bajas / archivo</button></div><input className="form-control" placeholder="Buscar por matrícula, marca o modelo…" aria-label="Buscar vehículo" value={search} onChange={(event) => setSearch(event.target.value)} /></div>
-      {loading ? <p className="text-secondary">Cargando vehículos…</p> : filtered.length === 0 ? <div className="text-center text-secondary py-4">No hay vehículos que coincidan con la búsqueda.</div> : <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Matrícula</th><th>Marca y modelo</th><th>ITV</th><th>Seguro</th><th>Estado</th><th className="text-end">Acciones</th></tr></thead><tbody>{filtered.map((vehicle) => <tr key={vehicle.id}><td className="fw-semibold text-uppercase">{vehicle.registration}</td><td>{vehicle.brand} {vehicle.model}</td><td>{vehicle.itv_expiry_date || '—'}</td><td>{vehicle.insurance_expiry_date || '—'}</td><td><span className={`badge ${vehicle.termination_date ? 'text-bg-secondary' : 'text-bg-success'}`}>{vehicle.termination_date ? `Baja: ${vehicle.termination_date}` : 'Activo'}</span></td><td><div className="d-flex flex-wrap justify-content-end gap-2"><button className="btn btn-sm btn-outline-primary" onClick={() => startEdit(vehicle)}>Ver / editar</button><button className={`btn btn-sm ${vehicle.termination_date ? 'btn-outline-success' : 'btn-outline-danger'}`} onClick={() => toggleArchive(vehicle)}>{vehicle.termination_date ? 'Reactivar' : 'Dar de baja'}</button></div></td></tr>)}</tbody></table></div>}
+      {loading ? <p className="text-secondary">Cargando vehículos…</p> : filtered.length === 0 ? <div className="text-center text-secondary py-4">No hay vehículos que coincidan con la búsqueda.</div> : <div className="table-responsive"><table className="table align-middle"><thead><tr><th>Matrícula</th><th>Marca y modelo</th><th>ITV</th><th>Seguro</th><th>Estado</th><th className="text-end">Acciones</th></tr></thead><tbody>{filtered.map((vehicle) => <tr key={vehicle.id}><td className="fw-semibold text-uppercase">{vehicle.registration}</td><td>{vehicle.brand} {vehicle.model}</td><td>{vehicle.itv_expiry_date || '—'}</td><td>{vehicle.insurance_expiry_date || '—'}</td><td><span className={`badge ${vehicle.termination_date ? 'text-bg-secondary' : 'text-bg-success'}`}>{vehicle.termination_date ? `Baja: ${vehicle.termination_date}` : 'Activo'}</span></td><td><div className="d-flex flex-wrap justify-content-end gap-2"><button className="btn btn-sm btn-outline-primary" onClick={() => startEdit(vehicle)}>Ver / editar</button><button className={`btn btn-sm ${vehicle.termination_date ? 'btn-outline-success' : 'btn-outline-danger'}`} onClick={() => toggleArchive(vehicle)}>{vehicle.termination_date ? 'Reactivar' : 'Dar de baja'}</button><button className="btn btn-sm btn-outline-danger" onClick={() => deleteVehicle(vehicle)} disabled={saving}>Eliminar</button></div></td></tr>)}</tbody></table></div>}
       <div className="small text-secondary">{filtered.length} vehículos en este apartado.</div>
     </div></div>}
   </>

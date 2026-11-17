@@ -9,6 +9,7 @@ const EMPTY = {
 }
 const BUCKET = 'worker-documents'
 const PAGE_SIZE = 9
+const safeTrim = (value) => String(value ?? '').trim()
 const normalizeSearch = (value) => String(value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('es').trim()
 const DOCUMENTS = [
   { key: 'dni_pdf_path', label: 'DNI / NIE (PDF con ambas caras)' },
@@ -95,14 +96,14 @@ export default function EmployeesPage() {
     event.preventDefault(); setNotice(null); setSaving(true)
     let createdId = editing !== 'new' ? editing : null
     try {
-      if (!form.first_name.trim() || !form.last_name.trim() || !form.dni.trim()) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
+      if (!safeTrim(form.first_name) || !safeTrim(form.last_name) || !safeTrim(form.dni)) throw new Error('Nombre, apellidos y DNI/NIE son obligatorios.')
       const { data: authData, error: authError } = await supabase.auth.getUser()
       if (authError) throw authError
       const payload = {
-        first_name: form.first_name.trim(), last_name: form.last_name.trim(), dni: form.dni.trim().toUpperCase(),
-        social_security_number: form.social_security_number.trim() || null, phone: form.phone.trim() || null,
-        address: form.address.trim() || null, population: form.population.trim() || null, province: form.province.trim() || null,
-        observations: form.observations.trim() || null, has_driving_license: Boolean(form.has_driving_license),
+        first_name: safeTrim(form.first_name), last_name: safeTrim(form.last_name), dni: safeTrim(form.dni).toUpperCase(),
+        social_security_number: safeTrim(form.social_security_number) || null, phone: safeTrim(form.phone) || null,
+        address: safeTrim(form.address) || null, population: safeTrim(form.population) || null, province: safeTrim(form.province) || null,
+        observations: safeTrim(form.observations) || null, has_driving_license: Boolean(form.has_driving_license),
         hire_date: form.hire_date || null, termination_date: form.termination_date || null,
         updated_by: authData.user?.id || null,
       }
@@ -116,28 +117,34 @@ export default function EmployeesPage() {
         if (result.error) throw result.error
       }
       const docPatch = {}
+      const oldPathsToRemove = []
       for (const doc of DOCUMENTS) {
+        const oldPath = records.find((item) => item.id === createdId)?.[doc.key]
         if (doc.key === 'driving_license_pdf_path' && !form.has_driving_license) {
-          const oldPath = records.find((item) => item.id === createdId)?.[doc.key]
           if (oldPath) {
-            const { error } = await supabase.storage.from(BUCKET).remove([oldPath])
-            if (error) throw error
             docPatch[doc.key] = null
+            oldPathsToRemove.push(oldPath)
           }
           continue
         }
         const uploaded = await uploadPdf(createdId, doc.key, files[doc.key])
         if (uploaded) {
           docPatch[doc.key] = uploaded
-          const oldPath = records.find((item) => item.id === createdId)?.[doc.key]
-          if (oldPath) await supabase.storage.from(BUCKET).remove([oldPath])
+          if (oldPath) oldPathsToRemove.push(oldPath)
         }
       }
       if (Object.keys(docPatch).length) {
         const { error } = await supabase.from('worker_records').update(docPatch).eq('id', createdId)
         if (error) throw error
       }
-      setNotice({ type: 'success', text: editing === 'new' ? 'Ficha creada correctamente.' : 'Ficha guardada correctamente.' })
+      let documentCleanupWarning = false
+      if (oldPathsToRemove.length) {
+        const { error } = await supabase.storage.from(BUCKET).remove(oldPathsToRemove)
+        documentCleanupWarning = Boolean(error)
+      }
+      setNotice(documentCleanupWarning
+        ? { type: 'warning', text: 'La ficha se ha guardado, pero no se pudieron borrar uno o varios PDF antiguos del almacenamiento.' }
+        : { type: 'success', text: editing === 'new' ? 'Ficha creada correctamente.' : 'Ficha guardada correctamente.' })
       setEditing(null); setFiles({}); await load()
     } catch (error) {
       setNotice({ type: 'danger', text: error.message || 'No se ha podido guardar la ficha.' })
@@ -154,6 +161,26 @@ export default function EmployeesPage() {
       window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
     } catch (error) { setNotice({ type: 'danger', text: error.message || 'No se ha podido abrir el documento.' }) }
     finally { setDocumentBusy('') }
+  }
+
+  async function removeDocument(record, key) {
+    const path = record?.[key]
+    if (!path) return
+    const label = DOCUMENTS.find((item) => item.key === key)?.label || 'documento'
+    if (!window.confirm(`¿Eliminar definitivamente el PDF de ${label.toLowerCase()} de ${record.first_name} ${record.last_name}?`)) return
+    setDocumentBusy(`${record.id}-${key}`)
+    setNotice(null)
+    try {
+      const { error: updateError } = await supabase.from('worker_records').update({ [key]: null }).eq('id', record.id)
+      if (updateError) throw updateError
+      const { error: storageError } = await supabase.storage.from(BUCKET).remove([path])
+      setRecords((current) => current.map((item) => item.id === record.id ? { ...item, [key]: null } : item))
+      setNotice(storageError
+        ? { type: 'warning', text: 'El PDF se ha desvinculado de la ficha, pero no se pudo borrar el archivo del almacenamiento. Contacta con el administrador.' }
+        : { type: 'success', text: 'PDF eliminado correctamente.' })
+    } catch (error) {
+      setNotice({ type: 'danger', text: error.message || 'No se ha podido eliminar el PDF.' })
+    } finally { setDocumentBusy('') }
   }
 
   function exportActiveWorkers() {
@@ -211,7 +238,7 @@ export default function EmployeesPage() {
         <div className="col-12 col-md-6"><label className="form-label" htmlFor="termination_date">Fecha de baja</label><input id="termination_date" name="termination_date" type="date" className="form-control" value={form.termination_date || ''} onChange={change}/><div className="form-text">Al indicar una fecha, la ficha aparecerá en el archivo de bajas.</div></div>
         <div className="col-12"><label className="form-label" htmlFor="observations">Observaciones (opcional)</label><textarea id="observations" name="observations" className="form-control" rows="3" value={form.observations || ''} onChange={change} maxLength={5000}/></div>
         <div className="col-12"><div className="form-check form-switch"><input id="has_driving_license" name="has_driving_license" className="form-check-input" type="checkbox" role="switch" checked={Boolean(form.has_driving_license)} onChange={change}/><label className="form-check-label" htmlFor="has_driving_license">Tiene carnet de conducir</label></div></div>
-        {DOCUMENTS.filter((doc) => doc.key !== 'driving_license_pdf_path' || form.has_driving_license).map((doc) => <div className="col-12 col-lg-4" key={doc.key}><label className="form-label" htmlFor={doc.key}>{doc.label}</label><input id={doc.key} className="form-control" type="file" accept="application/pdf,.pdf" onChange={(event) => setFiles((current) => ({ ...current, [doc.key]: event.target.files?.[0] || null }))}/><div className="form-text">PDF, máximo 10 MB. {editing !== 'new' && records.find((r) => r.id === editing)?.[doc.key] && 'Ya hay un documento guardado; subir otro lo sustituirá.'}</div>{editing !== 'new' && records.find((r) => r.id === editing)?.[doc.key] && <button type="button" className="btn btn-sm btn-outline-primary mt-2" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => openDocument(records.find((r) => r.id === editing), doc.key)}>{documentBusy === `${editing}-${doc.key}` ? 'Abriendo…' : 'Ver PDF actual'}</button>}</div>)}
+        {DOCUMENTS.filter((doc) => doc.key !== 'driving_license_pdf_path' || form.has_driving_license).map((doc) => <div className="col-12 col-lg-4" key={doc.key}><label className="form-label" htmlFor={doc.key}>{doc.label}</label><input id={doc.key} className="form-control" type="file" accept="application/pdf,.pdf" onChange={(event) => setFiles((current) => ({ ...current, [doc.key]: event.target.files?.[0] || null }))}/><div className="form-text">PDF, máximo 10 MB. {editing !== 'new' && records.find((r) => r.id === editing)?.[doc.key] && 'Ya hay un documento guardado; subir otro lo sustituirá.'}</div>{editing !== 'new' && records.find((r) => r.id === editing)?.[doc.key] && <div className="d-flex flex-wrap gap-2 mt-2"><button type="button" className="btn btn-sm btn-outline-primary" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => openDocument(records.find((r) => r.id === editing), doc.key)}>{documentBusy === `${editing}-${doc.key}` ? 'Abriendo…' : 'Ver PDF actual'}</button><button type="button" className="btn btn-sm btn-outline-danger" disabled={documentBusy === `${editing}-${doc.key}`} onClick={() => removeDocument(records.find((r) => r.id === editing), doc.key)}>Eliminar PDF</button></div>}</div>)}
         <div className="col-12 d-flex gap-2"><button className="btn btn-success" disabled={saving}>{saving ? 'Guardando…' : 'Guardar ficha'}</button><button type="button" className="btn btn-outline-secondary" onClick={() => { setEditing(null); setFiles({}) }}>Cancelar</button></div>
       </form>
     </div></div>}
