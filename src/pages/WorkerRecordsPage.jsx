@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import olivillaLogo from '../assets-olivilla-logo.jpg'
 
 const EMPTY = {
   first_name: '', last_name: '', dni: '', social_security_number: '', phone: '',
@@ -28,6 +29,10 @@ async function loadRecords() {
 
 function safeFileName(name) {
   return name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-100)
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>\"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', "'": '&#39;' }[char]))
 }
 
 async function uploadPdf(recordId, key, file) {
@@ -151,6 +156,28 @@ export default function EmployeesPage() {
     finally { setDocumentBusy('') }
   }
 
+  function exportActiveWorkers() {
+    const activeRecords = records
+      .filter((record) => !record.termination_date)
+      .sort((a, b) => `${a.last_name || ''} ${a.first_name || ''}`.localeCompare(`${b.last_name || ''} ${b.first_name || ''}`, 'es'))
+    if (!activeRecords.length) {
+      setNotice({ type: 'warning', text: 'No hay trabajadores activos para exportar.' })
+      return
+    }
+    const printWindow = window.open('', '_blank', 'width=900,height=700')
+    if (!printWindow) {
+      setNotice({ type: 'danger', text: 'El navegador ha bloqueado la ventana de impresión. Permite las ventanas emergentes e inténtalo de nuevo.' })
+      return
+    }
+    const rows = activeRecords.map((record) => `<tr><td>${escapeHtml(`${record.first_name || ''} ${record.last_name || ''}`.trim())}</td><td>${escapeHtml(record.dni || '')}</td></tr>`).join('')
+    const generatedAt = new Date().toLocaleDateString('es-ES')
+    printWindow.document.open()
+    printWindow.document.write(`<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Listado de trabajadores activos</title><style>
+      @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:0;font-size:12pt}.header{text-align:center;margin-bottom:24px}.logo{max-width:190px;max-height:78px;object-fit:contain;margin-bottom:12px}h1{font-size:17pt;margin:4px 0 5px;text-transform:uppercase}p{font-size:9pt;color:#666;margin:0}table{width:100%;border-collapse:collapse;margin-top:20px}th,td{border:1px solid #bbb;padding:9px 11px;text-align:left}th{background:#f0f2f0;font-size:10pt;text-transform:uppercase}tbody tr{break-inside:avoid} .count{margin-top:12px;text-align:right;font-size:9pt;color:#555}@media print{thead{display:table-header-group}}
+      </style></head><body><header class="header"><img class="logo" src="${escapeHtml(olivillaLogo)}" alt="Olivilla Tres"><h1>Listado de trabajadores activos</h1><p>Fecha de emisión: ${generatedAt}</p></header><table><thead><tr><th>Nombre y apellidos</th><th style="width:30%">DNI / NIE</th></tr></thead><tbody>${rows}</tbody></table><div class="count">Total: ${activeRecords.length} trabajadores</div><script>window.onload=function(){window.print()}</script></body></html>`)
+    printWindow.document.close()
+  }
+
   async function toggleArchive(record) {
     const isArchived = Boolean(record.termination_date)
     const date = isArchived ? null : new Date().toISOString().slice(0, 10)
@@ -165,7 +192,7 @@ export default function EmployeesPage() {
   return <>
     <div className="d-flex flex-column flex-md-row justify-content-between gap-3 mb-4">
       <div><h1 className="h2 fw-bold mb-1">Fichas de trabajadores</h1><p className="text-secondary mb-0">Datos laborales y documentación privada de cada trabajador.</p></div>
-      {!archive && !editing && <button className="btn btn-success align-self-md-start" onClick={startNew}>+ Añadir trabajador</button>}
+      {!editing && <div className="d-flex flex-wrap gap-2 align-self-md-start">{!archive && <button className="btn btn-outline-success" type="button" onClick={exportActiveWorkers} disabled={loading}>Exportar listado activo</button>}{!archive && <button className="btn btn-success" onClick={startNew}>+ Añadir trabajador</button>}</div>}
     </div>
     {notice && <div className={`alert alert-${notice.type}`} role="alert">{notice.text}</div>}
 

@@ -27,6 +27,8 @@ export default function PurchasesPage() {
   const [filters, setFilters] = useState({ from: '', to: '', worksite: '', search: '' })
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ worksiteId: '', customWorksite: '', useCustom: false, description: '', observations: '' })
+  const [worksiteSearch, setWorksiteSearch] = useState('')
+  const [worksitePickerOpen, setWorksitePickerOpen] = useState(false)
   const [reviewingId, setReviewingId] = useState(null)
   const [reviewForm, setReviewForm] = useState({ action: 'ordered', orderedAt: today(), expectedAt: '', reason: '' })
 
@@ -66,6 +68,8 @@ export default function PurchasesPage() {
 
   function resetForm() {
     setForm({ worksiteId: '', customWorksite: '', useCustom: false, description: '', observations: '' })
+    setWorksiteSearch('')
+    setWorksitePickerOpen(false)
     setEditingId(null)
   }
 
@@ -77,6 +81,8 @@ export default function PurchasesPage() {
       description: request.description || '',
       observations: request.observations || '',
     })
+    setWorksiteSearch(request.worksite_name || '')
+    setWorksitePickerOpen(false)
     setEditingId(request.id)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -176,6 +182,8 @@ export default function PurchasesPage() {
     } finally { setSaving(false) }
   }
 
+  const matchingWorksites = worksites.filter((site) => site.name.toLocaleLowerCase('es').includes(worksiteSearch.trim().toLocaleLowerCase('es')))
+
   if (!canSee) return <div className="alert alert-danger">No tienes permiso para acceder a Compras.</div>
 
   return <>
@@ -197,11 +205,14 @@ export default function PurchasesPage() {
           <div className="row g-3">
             <div className="col-12 col-md-6">
               <label className="form-label" htmlFor="purchase-worksite">Obra</label>
-              {!form.useCustom ? <select id="purchase-worksite" className="form-select" value={form.worksiteId} onChange={(e) => setForm((v) => ({ ...v, worksiteId: e.target.value }))}>
-                <option value="">Selecciona una obra…</option>
-                {worksites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
-              </select> : <input className="form-control" value={form.customWorksite} onChange={(e) => setForm((v) => ({ ...v, customWorksite: e.target.value }))} maxLength={160} placeholder="Nombre de la obra" />}
-              <button type="button" className="btn btn-link btn-sm px-0" onClick={() => setForm((v) => ({ ...v, useCustom: !v.useCustom, worksiteId: '', customWorksite: '' }))}>{form.useCustom ? 'Elegir una obra existente' : 'La obra no aparece: escribir otro nombre'}</button>
+              {!form.useCustom ? <div className="position-relative">
+                <input id="purchase-worksite" className="form-control" value={worksiteSearch} onFocus={() => setWorksitePickerOpen(true)} onBlur={() => setWorksitePickerOpen(false)} onChange={(e) => { setWorksiteSearch(e.target.value); setWorksitePickerOpen(true); setForm((v) => ({ ...v, worksiteId: '' })) }} placeholder="Pulsa para ver las obras o escribe para buscar…" autoComplete="off" role="combobox" aria-expanded={worksitePickerOpen} aria-controls="purchase-worksite-options" />
+                {worksitePickerOpen && <div id="purchase-worksite-options" className="list-group position-absolute w-100 shadow-sm" style={{ zIndex: 20, maxHeight: 240, overflowY: 'auto' }}>
+                  {matchingWorksites.length ? matchingWorksites.map((site) => <button type="button" className="list-group-item list-group-item-action" key={site.id} onMouseDown={(event) => event.preventDefault()} onClick={() => { setForm((v) => ({ ...v, worksiteId: site.id })); setWorksiteSearch(site.name); setWorksitePickerOpen(false) }}>{site.name}</button>) : <div className="list-group-item text-secondary small">No hay obras coincidentes.</div>}
+                </div>}
+                {form.worksiteId && <div className="form-text text-success">Obra seleccionada</div>}
+              </div> : <input className="form-control" value={form.customWorksite} onChange={(e) => setForm((v) => ({ ...v, customWorksite: e.target.value }))} maxLength={160} placeholder="Nombre de la obra" />}
+              <button type="button" className="btn btn-link btn-sm px-0" onClick={() => { setForm((v) => ({ ...v, useCustom: !v.useCustom, worksiteId: '', customWorksite: '' })); setWorksiteSearch(''); setWorksitePickerOpen(false) }}>{form.useCustom ? 'Elegir una obra existente' : 'La obra no aparece: escribir otro nombre'}</button>
             </div>
             <div className="col-12">
               <label className="form-label" htmlFor="purchase-description">Material que se necesita *</label>
