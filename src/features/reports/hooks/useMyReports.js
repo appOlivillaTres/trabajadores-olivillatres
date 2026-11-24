@@ -6,7 +6,7 @@ import { getReportChangeHistoryForReports } from '../../corrections/services/rep
 
 
 export function useMyReports() {
-  const [filters, setFilters] = useReportFilters({ workerId: '', hasIncidentOnly: false, searchText: '' })
+  const [filters, setFilters] = useReportFilters({ workerId: '', hasIncidentOnly: false, searchText: '' }, { shareDateRange: false })
   const initialFiltersRef = useRef(filters)
   const [reports, setReports] = useState([])
   const [loading, setLoading] = useState(true)

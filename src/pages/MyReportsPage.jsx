@@ -5,6 +5,7 @@ import WorkdayGroupCard from '../features/reports/components/WorkdayGroupCard'
 import { groupWorkReportsByWorkerDay } from '../features/reports/utils/groupWorkReportsByWorkerDay'
 import { useMyReports } from '../features/reports/hooks/useMyReports'
 import { useAuth } from '../hooks/useAuth'
+import { getDefaultReportDateRange } from '../features/reports/utils/reportFiltersStorage'
 
 export default function MyReportsPage() {
   const { filters, setFilters, reports, loading, error, correctionWarning, load } = useMyReports()
@@ -36,6 +37,12 @@ export default function MyReportsPage() {
     }
   }, [location.key, location.state, loading, dayGroups])
 
+  function applyDateRange(fromDate, toDate) {
+    const nextFilters = { ...filters, fromDate, toDate }
+    setFilters(nextFilters)
+    void load(nextFilters)
+  }
+
   function handleSearch(event) {
     event.preventDefault()
     if (filters.fromDate && filters.toDate && filters.fromDate > filters.toDate) return
@@ -46,6 +53,13 @@ export default function MyReportsPage() {
     <main>
       <h1 className="h2 fw-bold mb-1">Mis partes</h1>
       <p className="text-secondary mb-4">Consulta cada jornada con sus obras y horas. Por defecto se muestran los últimos 10 días; puedes cambiar el periodo cuando lo necesites.</p>
+
+      <div className="d-flex flex-wrap align-items-center gap-2 mb-3" aria-label="Periodos rápidos">
+        <span className="small text-secondary me-1">Mostrar:</span>
+        <button type="button" className="btn btn-sm btn-outline-success" onClick={() => { const range = getDefaultReportDateRange(); applyDateRange(range.fromDate, range.toDate) }}>Últimos 10 días</button>
+        <button type="button" className="btn btn-sm btn-outline-success" onClick={() => { const now = new Date(); const from = new Date(now.getFullYear(), now.getMonth(), 1); const to = new Date(now.getFullYear(), now.getMonth() + 1, 0); const format = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; applyDateRange(format(from), format(to)) }}>Mes actual</button>
+        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => { const now = new Date(); const from = new Date(now.getFullYear(), now.getMonth() - 1, 1); const to = new Date(now.getFullYear(), now.getMonth(), 0); const format = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; applyDateRange(format(from), format(to)) }}>Mes anterior</button>
+      </div>
 
       <ReportDateFilters
         fromDate={filters.fromDate}
